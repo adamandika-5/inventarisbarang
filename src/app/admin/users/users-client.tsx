@@ -1,0 +1,203 @@
+'use client'
+
+import { useState, useTransition } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { toggleUserActive, resetUserPassword } from './actions'
+
+interface User {
+  id: string
+  username: string
+  full_name: string
+  role: string
+  is_active: boolean
+  must_change_password: boolean
+  created_at: string
+  last_sign_in_at: string | null
+}
+
+interface UsersClientProps {
+  initialUsers: User[]
+  totalCount: number
+  page: number
+  pageSize: number
+  search: string
+}
+
+const dtf = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeZone: 'Asia/Jakarta' })
+
+export default function UsersClient({ initialUsers, totalCount, page, pageSize, search }: UsersClientProps) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const [isPending, startTransition] = useTransition()
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const totalPages = Math.ceil(totalCount / pageSize)
+
+  const showMsg = (type: 'success' | 'error', text: string) => {
+    setMessage({ type, text })
+    setTimeout(() => setMessage(null), 5000)
+  }
+
+  const updateParam = (key: string, value: string) => {
+    const p = new URLSearchParams(searchParams.toString())
+    if (value) p.set(key, value); else p.delete(key)
+    p.set('page', '1')
+    router.push(`${pathname}?${p.toString()}`)
+  }
+
+  const handleToggle = (id: string, isActive: boolean, fullName: string) => {
+    const msg = isActive ? `Nonaktifkan akun ${fullName}?` : `Aktifkan kembali akun ${fullName}?`
+    if (!confirm(msg)) return
+    startTransition(async () => {
+      const result = await toggleUserActive(id, isActive)
+      if (result.success) {
+        showMsg('success', `Akun ${fullName} berhasil ${isActive ? 'dinonaktifkan' : 'diaktifkan'}.`)
+        router.refresh()
+      } else {
+        showMsg('error', result.error ?? 'Gagal mengubah status akun.')
+      }
+    })
+  }
+
+  const handleResetPassword = (id: string, fullName: string) => {
+    const tempPass = prompt(`Reset password ${fullName}.\n\nMasukkan password sementara (minimal 8 karakter):`)
+    if (!tempPass || tempPass.length < 8) {
+      if (tempPass !== null) showMsg('error', 'Password sementara minimal 8 karakter.')
+      return
+    }
+    if (!confirm(`Anda akan mengatur ulang password ${fullName}. Lanjutkan?`)) return
+
+    startTransition(async () => {
+      const formData = new FormData()
+      formData.set('user_id', id)
+      formData.set('new_password', tempPass)
+      const result = await resetUserPassword(formData)
+      if (result.success) {
+        showMsg('success', `Password ${fullName} berhasil direset. Pengguna harus mengganti password saat login.`)
+      } else {
+        showMsg('error', result.error ?? 'Gagal mereset password.')
+      }
+    })
+  }
+
+  return (
+    <div>
+      {message && (
+        <div role="alert" className={message.type === 'success' ? 'alert-success mb-4' : 'alert-error mb-4'}>
+          {message.text}
+        </div>
+      )}
+
+      <div className="mb-4 flex items-center justify-between">
+        <input
+          id="search-user"
+          type="search"
+          placeholder="Cari nama atau username…"
+          defaultValue={search}
+          className="input max-w-sm"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') updateParam('search', (e.target as HTMLInputElement).value)
+          }}
+        />
+        <Link href="/admin/users/new" id="btn-tambah-pegawai" className="btn-primary">
+          + Tambah Pegawai
+        </Link>
+      </div>
+
+      {initialUsers.length === 0 ? (
+        <div className="card py-12 text-center text-gray-500">
+          <p className="text-lg font-medium">Tidak ada pengguna ditemukan</p>
+        </div>
+      ) : (
+        <div className="table-container">
+          <table className="table" aria-label="Daftar pengguna">
+            <thead>
+              <tr>
+                <th scope="col">Nama Lengkap</th>
+                <th scope="col">Username</th>
+                <th scope="col">Peran</th>
+                <th scope="col">Status</th>
+                <th scope="col">Password</th>
+                <th scope="col">Terdaftar</th>
+                <th scope="col" className="text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100 bg-white">
+              {initialUsers.map((user) => (
+                <tr key={user.id}>
+                  <td className="font-medium">{user.full_name}</td>
+                  <td>
+                    <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">{user.username}</code>
+                  </td>
+                  <td>
+                    <span className={user.role === 'ADMIN' ? 'text-blue-700 text-sm font-medium' : 'text-sm text-gray-600'}>
+                      {user.role === 'ADMIN' ? 'Admin' : 'Pegawai'}
+                    </span>
+                  </td>
+                  <td>
+                    {user.is_active ? (
+                      <span className="badge-aman">Aktif</span>
+                    ) : (
+                      <span className="badge-nonaktif">Nonaktif</span>
+                    )}
+                  </td>
+                  <td>
+                    {user.must_change_password ? (
+                      <span className="badge-hampir-habis text-xs">Harus ganti</span>
+                    ) : (
+                      <span className="text-xs text-gray-400">Normal</span>
+                    )}
+                  </td>
+                  <td className="text-sm text-gray-500">
+                    {dtf.format(new Date(user.created_at))}
+                  </td>
+                  <td className="text-right">
+                    {user.role !== 'ADMIN' && (
+                      <div className="flex justify-end gap-2">
+                        <button
+                          id={`btn-toggle-user-${user.id}`}
+                          type="button"
+                          className={user.is_active ? 'btn-ghost text-sm text-red-600' : 'btn-ghost text-sm text-green-600'}
+                          onClick={() => handleToggle(user.id, user.is_active, user.full_name)}
+                          disabled={isPending}
+                        >
+                          {user.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                        </button>
+                        <button
+                          id={`btn-reset-password-${user.id}`}
+                          type="button"
+                          className="btn-secondary text-sm"
+                          onClick={() => handleResetPassword(user.id, user.full_name)}
+                          disabled={isPending}
+                        >
+                          Reset Password
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <nav className="mt-4 flex items-center justify-between">
+          <p className="text-sm text-gray-600">Halaman {page} dari {totalPages} ({totalCount} pengguna)</p>
+          <div className="flex gap-2">
+            <button type="button" className="btn-secondary text-sm"
+              onClick={() => updateParam('page', String(page - 1))} disabled={page <= 1}>
+              &laquo; Sebelumnya
+            </button>
+            <button type="button" className="btn-secondary text-sm"
+              onClick={() => updateParam('page', String(page + 1))} disabled={page >= totalPages}>
+              Berikutnya &raquo;
+            </button>
+          </div>
+        </nav>
+      )}
+    </div>
+  )
+}
