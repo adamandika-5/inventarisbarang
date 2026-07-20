@@ -45,7 +45,7 @@ export default function SettingsForm({ settings }: { settings: AppSettings | nul
             maxLength={200}
             defaultValue={settings?.institution_name ?? ''}
             className="input"
-            placeholder="Contoh: Dinas Pendidikan Kota Bandung"
+            placeholder="Contoh: Universitas Pesantren Tinggi Darul Ulum Jombang"
           />
           <p className="mt-1 text-xs text-gray-500">Ditampilkan di header laporan.</p>
         </div>

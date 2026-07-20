@@ -1,38 +1,33 @@
-/**
- * Login API Route Handler
- *
- * SECURITY:
- * - Receives username + password from client
- * - Looks up internal email mapping in private.auth_login_identifiers (server-only)
- * - Never returns internal email to client
- * - Generic error messages regardless of failure reason
- * - Rate limiting handled at Next.js/Supabase level
- * - CSRF: protected by same-origin + SameSite cookie policy
- *
- * NOTE: Supabase GoTrue handles the actual password verification.
- * This route acts as a BFF (Backend-for-Frontend) to translate
- * username → internal email for Supabase Auth.
- *
- * TODO(security): Add explicit rate limiting middleware for this endpoint
- * (e.g., using Upstash Redis if available, or Supabase's built-in auth rate limiting)
- */
-import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import type { Database } from '@/types/database'
+
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { normalizeUsername } from '@/lib/validation/auth'
 
 const loginSchema = z.object({
-  username: z
-    .string()
-    .min(3)
-    .max(32)
-    .regex(/^[a-z0-9._-]+$/),
+  username: z.preprocess(
+    (value) =>
+      typeof value === 'string' ? normalizeUsername(value) : value,
+    z
+      .string()
+      .min(3)
+      .max(32)
+      .regex(/^[a-z0-9._-]+$/),
+  ),
   password: z.string().min(10).max(128),
 })
 
-// Generic error response — never reveal whether username exists or account is inactive
 const GENERIC_AUTH_ERROR = {
-  error: 'Username atau kata sandi tidak valid.',
+  error: 'Username atau kata sandi tidak valid. Silakan coba lagi.',
+}
+
+const SERVER_ERROR = {
+  error: 'Terjadi kesalahan pada server.',
+}
+
+type LoginIdentifierRow = {
+  auth_user_id: string
 }
 
 export async function POST(request: NextRequest) {
@@ -41,96 +36,123 @@ export async function POST(request: NextRequest) {
     const parsed = loginSchema.safeParse(body)
 
     if (!parsed.success) {
-      // Return generic error — don't reveal validation details
       return NextResponse.json(GENERIC_AUTH_ERROR, { status: 401 })
     }
 
-    const { username, password } = parsed.data
-    const usernameNormalized = username.toLowerCase().trim()
+    // Username sudah dinormalisasi oleh loginSchema.
+    // Password tidak diubah kapitalisasinya.
+    const usernameNormalized = parsed.data.username
+    const password = parsed.data.password
 
-    // Step 1: Look up internal email from private table (server-side only)
-    // This lookup uses service role key to access private schema
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-    if (!serviceRoleKey) {
-      console.error('SUPABASE_SERVICE_ROLE_KEY is not configured')
-      return NextResponse.json({ error: 'Konfigurasi server tidak lengkap.' }, { status: 500 })
+
+    if (!supabaseUrl || !serviceRoleKey) {
+      console.error('LOGIN_CONFIG_MISSING')
+      return NextResponse.json(SERVER_ERROR, { status: 500 })
     }
 
-    const { createClient } = await import('@supabase/supabase-js')
-    const adminClient = createClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      serviceRoleKey,
-      { auth: { autoRefreshToken: false, persistSession: false } },
-    )
-
-    // SECURITY: Query private schema — not accessible to client-side Supabase
-    const { data: loginIdentifier, error: lookupError } = await adminClient
-      .schema('private')
-      .from('auth_login_identifiers')
-      .select('auth_user_id')
-      .eq('username_normalized', usernameNormalized)
-      .single()
-
-    if (lookupError || !loginIdentifier) {
-      // Return generic error — don't reveal username doesn't exist
-      return NextResponse.json(GENERIC_AUTH_ERROR, { status: 401 })
-    }
-
-    // Step 2: Get internal email from auth.users using admin client
-    const { data: authUser, error: userError } = await adminClient.auth.admin.getUserById(
-      loginIdentifier.auth_user_id,
-    )
-
-    if (userError || !authUser.user?.email) {
-      return NextResponse.json(GENERIC_AUTH_ERROR, { status: 401 })
-    }
-
-    // Step 3: Authenticate using internal email (never sent to client)
-    // Create a fresh client to perform the actual sign-in
-    const supabase = await createSupabaseServerClient()
-
-    const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-      email: authUser.user.email,
-      password,
+    const adminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
     })
 
-    if (signInError || !signInData.user) {
-      // Generic error — don't reveal whether it was username or password
+    /*
+     * Jangan mengakses schema private melalui:
+     * adminClient.schema('private')
+     *
+     * Gunakan RPC SECURITY DEFINER yang sudah dibuat pada migration 004.
+     */
+    const { data: lookupData, error: lookupError } =
+      await adminClient.rpc('lookup_login_identifier', {
+        p_username_normalized: usernameNormalized,
+      })
+
+    if (lookupError) {
+      console.error('LOGIN_LOOKUP_FAILED', {
+        code: lookupError.code,
+      })
+
+      return NextResponse.json(SERVER_ERROR, { status: 500 })
+    }
+
+    const loginIdentifier = (
+      lookupData as LoginIdentifierRow[] | null
+    )?.[0]
+
+    if (!loginIdentifier?.auth_user_id) {
       return NextResponse.json(GENERIC_AUTH_ERROR, { status: 401 })
     }
 
-    // Step 4: Verify profile is active (defense in depth)
+    const { data: authUser, error: userError } =
+      await adminClient.auth.admin.getUserById(
+        loginIdentifier.auth_user_id,
+      )
+
+    if (userError || !authUser.user?.email) {
+      if (userError) {
+        console.error('LOGIN_AUTH_USER_LOOKUP_FAILED', {
+          status: userError.status,
+        })
+      }
+
+      return NextResponse.json(GENERIC_AUTH_ERROR, { status: 401 })
+    }
+
+    const supabase = await createSupabaseServerClient()
+
+    const { data: signInData, error: signInError } =
+      await supabase.auth.signInWithPassword({
+        email: authUser.user.email,
+        password,
+      })
+
+    if (signInError || !signInData.user) {
+      return NextResponse.json(GENERIC_AUTH_ERROR, { status: 401 })
+    }
+
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
       .select('role,is_active,must_change_password')
       .eq('id', signInData.user.id)
       .single()
 
-    if (profileError || !profile) {
-      // Sign out immediately — no valid profile
+    if (profileError || !profile || !profile.is_active) {
+      if (profileError) {
+        console.error('LOGIN_PROFILE_LOOKUP_FAILED', {
+          code: profileError.code,
+        })
+      }
+
       await supabase.auth.signOut()
+
       return NextResponse.json(GENERIC_AUTH_ERROR, { status: 401 })
     }
 
-    if (!profile.is_active) {
-      // Sign out immediately — account deactivated
-      await supabase.auth.signOut()
-      return NextResponse.json(GENERIC_AUTH_ERROR, { status: 401 })
-    }
-
-    // SECURITY: Never log password, token, or internal email
-    // Success — return only safe non-sensitive data
     return NextResponse.json({
       role: profile.role,
       mustChangePassword: profile.must_change_password,
     })
-  } catch {
-    // Do not expose internal error details
-    return NextResponse.json({ error: 'Terjadi kesalahan pada server.' }, { status: 500 })
+  } catch (error) {
+    console.error(
+      'LOGIN_UNEXPECTED_ERROR',
+      error instanceof Error ? error.name : 'UnknownError',
+    )
+
+    return NextResponse.json(SERVER_ERROR, { status: 500 })
   }
 }
 
-// Only allow POST
 export async function GET() {
-  return NextResponse.json({ error: 'Method not allowed.' }, { status: 405 })
+  return NextResponse.json(
+    { error: 'Method not allowed.' },
+    {
+      status: 405,
+      headers: {
+        Allow: 'POST',
+      },
+    },
+  )
 }
