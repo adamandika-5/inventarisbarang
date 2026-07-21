@@ -20,8 +20,12 @@ const stockInSchema = z.object({
     .transform((v) => parseInt(v, 10)),
   transaction_unit_price: z
     .string()
-    .regex(/^\d+(\.\d+)?$/, 'Harga tidak valid.')
-    .transform(Number),
+    .regex(/^\d+$/, 'Harga harus berupa bilangan bulat.')
+    .refine((v) => {
+      const num = parseInt(v, 10)
+      return !isNaN(num) && num >= 0 && num <= 1000000000000
+    }, 'Harga tidak valid atau melebihi batas.')
+    .transform((v) => parseInt(v, 10)),
 })
 
 export interface ActionResult {
@@ -67,12 +71,14 @@ export async function processStockIn(formData: FormData): Promise<ActionResult> 
     const { data, error } = await supabase.rpc('process_stock_in', {
       p_client_request_id: parsed.data.client_request_id,
       p_item_id: parsed.data.item_id,
-      p_unit_id: parsed.data.unit_id,
       p_input_quantity: parsed.data.input_quantity,
-      p_transaction_unit_price: parsed.data.transaction_unit_price.toString(),
+      p_unit_id: parsed.data.unit_id,
+      p_unit_price: String(parsed.data.transaction_unit_price),
     })
 
     if (error) {
+      console.error(`process_stock_in failed - code: ${error.code}, message: ${error.message}`)
+      
       // Translate known RPC errors
       if (error.message.includes('already processed')) {
         return { success: false, error: 'Transaksi ini sudah pernah diproses (duplikat).' }
