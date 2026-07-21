@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { PasswordInput } from '@/components/password-input'
 import { createEmployee } from '../actions'
 
 export default function NewEmployeeForm() {
@@ -66,17 +67,17 @@ export default function NewEmployeeForm() {
           <label htmlFor="new-user-password" className="label mb-1">
             Password Sementara <span className="text-red-500">*</span>
           </label>
-          <input
+          <PasswordInput
             id="new-user-password"
             name="password"
-            type="password"
+            autoComplete="new-password"
             required
-            minLength={8}
+            minLength={10}
             maxLength={72}
-            placeholder="Minimal 8 karakter"
+            placeholder="Minimal 10 karakter"
             className="input"
           />
-          <p className="mt-1 text-xs text-gray-500">Pegawai harus mengganti password ini saat pertama login.</p>
+          <p className="mt-1 text-xs text-gray-500">Minimal 10 karakter. Pegawai harus mengganti password ini saat pertama login.</p>
         </div>
 
         <div className="rounded-md bg-blue-50 p-3 text-xs text-blue-700">

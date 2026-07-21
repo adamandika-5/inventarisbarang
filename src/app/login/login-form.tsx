@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { PasswordInput } from '@/components/password-input'
 import { validateUsername, validatePassword } from '@/lib/validation/auth'
 
 interface FormState {
@@ -145,9 +146,8 @@ export default function LoginForm() {
         <label htmlFor="password" className="label mb-1">
           Kata Sandi
         </label>
-        <input
+        <PasswordInput
           id="password"
-          type="password"
           autoComplete="current-password"
           className={`input ${state.errors.password ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
           value={state.password}

@@ -100,7 +100,43 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
     clientRequestIdRef.current = crypto.randomUUID() // reset idempotency key on unit change
   }
 
-  const priceNum = parseFloat(price) || 0
+  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const input = e.target
+    const val = input.value
+    const digits = val.replace(/\D/g, '')
+
+    if (digits && parseInt(digits, 10) > 1000000000000) {
+      return
+    }
+
+    const selectionStart = input.selectionStart ?? 0
+    const textBeforeCursor = val.substring(0, selectionStart)
+    const digitsBeforeCursor = textBeforeCursor.replace(/\D/g, '').length
+
+    setPrice(digits)
+
+    const formatted = digits ? new Intl.NumberFormat('id-ID').format(parseInt(digits, 10)) : ''
+
+    setTimeout(() => {
+      let newCursorPos = 0
+      let digitCount = 0
+      for (let i = 0; i < formatted.length; i++) {
+        if (/\d/.test(formatted[i]!)) {
+          digitCount++
+          if (digitCount === digitsBeforeCursor) {
+            newCursorPos = i + 1
+            break
+          }
+        }
+      }
+      if (newCursorPos === 0 && digitsBeforeCursor > 0) {
+        newCursorPos = formatted.length
+      }
+      input.setSelectionRange(newCursorPos, newCursorPos)
+    }, 0)
+  }
+
+  const priceNum = parseInt(price, 10) || 0
   const simulation = selectedItem && selectedUnit && quantity > 0 && priceNum > 0
     ? simulateMovingAverage(
         Number(selectedItem.current_stock),
@@ -157,6 +193,7 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
         <input type="hidden" name="client_request_id" value={clientRequestIdRef.current} />
         <input type="hidden" name="item_id" value={selectedItem?.id ?? ''} />
         <input type="hidden" name="unit_id" value={selectedUnit?.id ?? ''} />
+        <input type="hidden" name="transaction_unit_price" value={price} />
 
         <div className="card space-y-5">
           {/* Item search */}
@@ -226,13 +263,17 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">Rp</span>
                   <input
                     id="stock-in-price"
-                    name="transaction_unit_price"
-                    type="number"
-                    min={0}
-                    step={1}
+                    type="text"
+                    inputMode="numeric"
                     required
-                    value={price}
-                    onChange={(e) => setPrice(e.target.value)}
+                    value={price ? new Intl.NumberFormat('id-ID').format(parseInt(price, 10)) : ''}
+                    onChange={handlePriceChange}
+                    onKeyDown={(e) => {
+                      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                        e.preventDefault()
+                      }
+                    }}
+                    onWheel={(e) => e.currentTarget.blur()}
                     placeholder="0"
                     className="input pl-9"
                   />

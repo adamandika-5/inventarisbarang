@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { PasswordInput } from '@/components/password-input'
 import { validatePassword } from '@/lib/validation/auth'
 
 interface FormState {
@@ -19,7 +19,6 @@ interface FormState {
 }
 
 export default function ChangePasswordForm() {
-  const router = useRouter()
   const [state, setState] = useState<FormState>({
     currentPassword: '',
     newPassword: '',
@@ -38,8 +37,9 @@ export default function ChangePasswordForm() {
       // Client-side validation
       const errors: FormState['errors'] = {}
 
-      const currentPasswordError = validatePassword(state.currentPassword)
-      if (currentPasswordError) errors.currentPassword = currentPasswordError
+      if (!state.currentPassword) {
+        errors.currentPassword = 'Kata sandi saat ini wajib diisi.'
+      }
 
       const newPasswordError = validatePassword(state.newPassword)
       if (newPasswordError) errors.newPassword = newPasswordError
@@ -70,8 +70,9 @@ export default function ChangePasswordForm() {
           credentials: 'same-origin',
         })
 
-        if (!response.ok) {
-          const data = (await response.json()) as { error?: string }
+        const data = (await response.json()) as { success?: boolean; error?: string; redirectTo?: string }
+
+        if (!response.ok || !data.success) {
           setState((prev) => ({
             ...prev,
             isSubmitting: false,
@@ -84,11 +85,11 @@ export default function ChangePasswordForm() {
 
         setState((prev) => ({ ...prev, isSubmitting: false, success: true }))
 
-        // Redirect to dashboard after success
+        // Redirect using window.location.replace to clear history stack and force server reload
+        const destination = data.redirectTo || '/login'
         setTimeout(() => {
-          router.push('/')
-          router.refresh()
-        }, 1500)
+          window.location.replace(destination)
+        }, 1000)
       } catch {
         setState((prev) => ({
           ...prev,
@@ -99,14 +100,14 @@ export default function ChangePasswordForm() {
         }))
       }
     },
-    [state, router],
+    [state],
   )
 
   if (state.success) {
     return (
       <div className="alert-success text-center">
         <p className="font-medium">Kata sandi berhasil diubah!</p>
-        <p className="mt-1 text-sm">Anda akan diarahkan ke dashboard...</p>
+        <p className="mt-1 text-sm">Mengalihkan ke halaman utama...</p>
       </div>
     )
   }
@@ -123,9 +124,8 @@ export default function ChangePasswordForm() {
         <label htmlFor="current-password" className="label mb-1">
           Kata Sandi Saat Ini
         </label>
-        <input
+        <PasswordInput
           id="current-password"
-          type="password"
           autoComplete="current-password"
           className={`input ${state.errors.currentPassword ? 'border-red-500' : ''}`}
           value={state.currentPassword}
@@ -148,9 +148,8 @@ export default function ChangePasswordForm() {
         <label htmlFor="new-password" className="label mb-1">
           Kata Sandi Baru
         </label>
-        <input
+        <PasswordInput
           id="new-password"
-          type="password"
           autoComplete="new-password"
           className={`input ${state.errors.newPassword ? 'border-red-500' : ''}`}
           value={state.newPassword}
@@ -174,9 +173,8 @@ export default function ChangePasswordForm() {
         <label htmlFor="confirm-password" className="label mb-1">
           Konfirmasi Kata Sandi Baru
         </label>
-        <input
+        <PasswordInput
           id="confirm-password"
-          type="password"
           autoComplete="new-password"
           className={`input ${state.errors.confirmPassword ? 'border-red-500' : ''}`}
           value={state.confirmPassword}

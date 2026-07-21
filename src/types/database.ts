@@ -458,6 +458,21 @@ export type Database = {
         Args: Record<string, unknown>
         Returns: UserRole
       }
+      // Complete forced password change (clear must_change_password flag)
+      complete_forced_password_change: {
+        Args: Record<string, unknown>
+        Returns: undefined
+      }
+      // Create employee account (admin, via session client)
+      create_employee_account: {
+        Args: {
+          p_username: string
+          p_full_name: string
+          p_temporary_password: string
+          p_auth_user_id: string
+        }
+        Returns: undefined
+      }
       // Process stock OUT transaction (employee)
       process_stock_out: {
         Args: {
@@ -479,7 +494,7 @@ export type Database = {
           p_item_id: string
           p_unit_id: string
           p_input_quantity: number
-          p_transaction_unit_price: string // NUMERIC parameter passed as string or number
+          p_unit_price: string // NUMERIC parameter passed as string or number
         }
         Returns: {
           transaction_id: string
@@ -494,7 +509,7 @@ export type Database = {
           p_item_id: string
           p_unit_id: string
           p_input_quantity: number
-          p_transaction_unit_price: string
+          p_unit_price: string
         }
         Returns: {
           transaction_id: string
