@@ -1,4 +1,6 @@
 import type { Metadata } from 'next'
+import { redirect } from 'next/navigation'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
 import ChangePasswordForm from './change-password-form'
 
 export const metadata: Metadata = {
@@ -6,7 +8,32 @@ export const metadata: Metadata = {
   description: 'Ganti kata sandi akun Anda',
 }
 
-export default function ChangePasswordPage() {
+export default async function ChangePasswordPage() {
+  const supabase = await createSupabaseServerClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    redirect('/login')
+  }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role,is_active,must_change_password')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || !profile.is_active) {
+    redirect('/login')
+  }
+
+  // If user does not need to change password, redirect to appropriate dashboard
+  if (!profile.must_change_password) {
+    redirect(profile.role === 'ADMIN' ? '/admin' : '/employee')
+  }
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
       <div className="w-full max-w-md">

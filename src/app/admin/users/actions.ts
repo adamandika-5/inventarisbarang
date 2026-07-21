@@ -7,6 +7,9 @@
  * - Cannot create or promote admin accounts
  * - Cannot deactivate self
  * - Uses admin Supabase client for auth.admin operations
+ * - Employee profile created via RPC (not direct insert) to bypass RLS
+ *   and ensure atomicity of profile + login mapping + audit log
+ * - Passwords are never logged, stored in profile, or included in error messages
  */
 
 import { createSupabaseServerClient, createSupabaseAdmin } from '@/lib/supabase/server'
@@ -66,7 +69,7 @@ export async function resetUserPassword(formData: FormData): Promise<ActionResul
   try {
     const schema = z.object({
       user_id: z.string().uuid(),
-      new_password: z.string().min(8, 'Password minimal 8 karakter.').max(72),
+      new_password: z.string().min(10, 'Password minimal 10 karakter.').max(72),
     })
 
     const parsed = schema.safeParse({
@@ -107,14 +110,29 @@ export async function resetUserPassword(formData: FormData): Promise<ActionResul
 
 /**
  * Create a new employee account (admin only)
- * Cannot create admin accounts
+ * Cannot create admin accounts.
+ *
+ * Flow:
+ * 1. Validate & normalize input
+ * 2. Check username uniqueness
+ * 3. Create auth user via service-role admin client
+ * 4. Call create_employee_account RPC via session client (auth.uid() = admin)
+ *    → creates profile, private.auth_login_identifiers, audit log atomically
+ * 5. If RPC fails → rollback auth user
  */
 export async function createEmployee(formData: FormData): Promise<ActionResult> {
   try {
     const schema = z.object({
-      username: z.string().min(3).max(50).regex(/^[a-z0-9._-]+$/, 'Username hanya boleh huruf kecil, angka, titik, underscore, atau dash.').trim(),
+      username: z.string()
+        .transform((v) => v.toLowerCase().trim())
+        .pipe(
+          z.string()
+            .min(3, 'Username minimal 3 karakter.')
+            .max(50, 'Username maksimal 50 karakter.')
+            .regex(/^[a-z0-9._-]+$/, 'Username hanya boleh huruf kecil, angka, titik, underscore, atau dash.')
+        ),
       full_name: z.string().min(1, 'Nama lengkap wajib diisi.').max(200).trim(),
-      password: z.string().min(8, 'Password minimal 8 karakter.').max(72),
+      password: z.string().min(10, 'Password sementara minimal 10 karakter.').max(72),
     })
 
     const parsed = schema.safeParse({
@@ -127,16 +145,18 @@ export async function createEmployee(formData: FormData): Promise<ActionResult> 
     const { supabase, isAdmin } = await verifyAdmin()
     if (!isAdmin) return { success: false, error: 'Akses ditolak.' }
 
+    const normalizedUsername = parsed.data.username // already lowercased + trimmed by schema
+
     // Check username uniqueness
     const { count } = await supabase
       .from('profiles')
       .select('id', { count: 'exact', head: true })
-      .eq('username_normalized', parsed.data.username.toLowerCase())
+      .eq('username_normalized', normalizedUsername)
     if (count && count > 0) return { success: false, error: 'Username sudah digunakan.' }
 
-    // Create auth user using admin client
+    // Create auth user using admin (service-role) client
     const adminClient = createSupabaseAdmin()
-    const email = `${parsed.data.username}@inventarisbarang.local`
+    const email = `${normalizedUsername}@inventarisbarang.local`
     const { data: authUser, error: authError } = await adminClient.auth.admin.createUser({
       email,
       password: parsed.data.password,
@@ -146,19 +166,21 @@ export async function createEmployee(formData: FormData): Promise<ActionResult> 
       return { success: false, error: 'Gagal membuat akun autentikasi.' }
     }
 
-    // Create profile
-    const { error: profileError } = await supabase.from('profiles').insert({
-      id: authUser.user.id,
-      username: parsed.data.username,
-      username_normalized: parsed.data.username.toLowerCase(),
-      full_name: parsed.data.full_name,
-      role: 'EMPLOYEE',
-      is_active: true,
-      must_change_password: true,
+    // Call RPC via session client so auth.uid() = admin who is logged in
+    // RPC creates: profile, private.auth_login_identifiers, audit log atomically
+    const { error: rpcError } = await supabase.rpc('create_employee_account', {
+      p_username: normalizedUsername,
+      p_full_name: parsed.data.full_name,
+      p_temporary_password: parsed.data.password,
+      p_auth_user_id: authUser.user.id,
     })
 
-    if (profileError) {
-      // Rollback auth user
+    if (rpcError) {
+      // Log safe diagnostic info (NEVER log password or credentials)
+      console.error(
+        `create_employee_account RPC failed - code: ${rpcError.code}, message: ${rpcError.message}`
+      )
+      // Rollback: delete the auth user we just created
       await adminClient.auth.admin.deleteUser(authUser.user.id)
       return { success: false, error: 'Gagal membuat profil pengguna.' }
     }

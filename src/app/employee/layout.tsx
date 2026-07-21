@@ -1,8 +1,9 @@
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import EmployeeNav from './components/employee-nav'
 
 /**
- * Employee root layout — verifies employee role server-side.
+ * Employee root layout — verifies active user role server-side.
  */
 export default async function EmployeeLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createSupabaseServerClient()
@@ -17,7 +18,7 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('role,is_active,must_change_password,full_name')
+    .select('role,is_active,must_change_password,full_name,username')
     .eq('id', user.id)
     .single()
 
@@ -29,8 +30,14 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
     redirect('/change-password')
   }
 
-  // Employees stay in employee routes, admins can also access employee features
-  // but admin should use /admin routes for admin-specific features
+  const fullName = profile.full_name ?? profile.username ?? 'Pegawai'
 
-  return <>{children}</>
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <EmployeeNav fullName={fullName} />
+      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+        {children}
+      </main>
+    </div>
+  )
 }

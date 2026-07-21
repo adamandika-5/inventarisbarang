@@ -187,9 +187,9 @@ export default function ItemDetailClient({
 
           <div>
             <label htmlFor="edit-item-category" className="label mb-1">Kategori</label>
-            <select id="edit-item-category" name="category_id" className="input">
+            <select id="edit-item-category" name="category_id" className="input" defaultValue={item.categories?.id ?? ''}>
               {categories.map((c) => (
-                <option key={c.id} value={c.id} selected={c.id === item.categories?.id}>
+                <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
@@ -198,9 +198,9 @@ export default function ItemDetailClient({
 
           <div>
             <label htmlFor="edit-item-barcode-format" className="label mb-1">Format Barcode</label>
-            <select id="edit-item-barcode-format" name="barcode_format" className="input">
+            <select id="edit-item-barcode-format" name="barcode_format" className="input" defaultValue={item.barcode_format}>
               {BARCODE_FORMATS.map((f) => (
-                <option key={f} value={f} selected={f === item.barcode_format}>{f}</option>
+                <option key={f} value={f}>{f}</option>
               ))}
             </select>
           </div>
