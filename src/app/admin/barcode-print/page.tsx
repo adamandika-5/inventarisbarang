@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import BarcodePrintClient from './barcode-print-client'
 
@@ -19,7 +19,7 @@ export default async function BarcodePrintPage() {
     return (
       <div>
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Cetak Barcode</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Cetak Barcode</h1>
         </div>
         <div className="alert-error">Gagal memuat data barang. Coba muat ulang halaman.</div>
       </div>
@@ -29,8 +29,8 @@ export default async function BarcodePrintPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Cetak Barcode</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Cetak Barcode</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Pilih barang, tentukan jumlah salinan, lalu cetak label barcode.
         </p>
       </div>

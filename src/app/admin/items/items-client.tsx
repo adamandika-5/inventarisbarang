@@ -139,7 +139,7 @@ export default function ItemsClient({
 
       {/* Table */}
       {initialItems.length === 0 ? (
-        <div className="card py-12 text-center text-gray-500">
+        <div className="card py-12 text-center text-gray-500 dark:text-slate-400">
           <p className="text-lg font-medium">Tidak ada barang</p>
           <p className="mt-1 text-sm">Coba ubah filter atau tambah barang baru.</p>
         </div>
@@ -157,7 +157,7 @@ export default function ItemsClient({
                 <th scope="col" className="text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
               {initialItems.map((item) => {
                 const stockStatus = item.is_active
                   ? getStockStatus(item.current_stock, item.minimum_stock)
@@ -166,14 +166,14 @@ export default function ItemsClient({
                 return (
                   <tr key={item.id}>
                     <td>
-                      <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono">{item.sku}</code>
+                      <code className="code-chip">{item.sku}</code>
                     </td>
                     <td>
-                      <span className="font-medium text-gray-900">{item.name}</span>
-                      <div className="text-xs text-gray-500">{item.barcode}</div>
+                      <span className="font-medium text-gray-900 dark:text-slate-100">{item.name}</span>
+                      <div className="text-xs text-gray-500 dark:text-slate-400">{item.barcode}</div>
                     </td>
-                    <td className="text-sm text-gray-600">{item.categories?.name ?? '—'}</td>
-                    <td className="text-sm">
+                    <td className="text-sm text-gray-600 dark:text-slate-300">{item.categories?.name ?? '—'}</td>
+                    <td className="text-sm text-gray-700 dark:text-slate-200">
                       {stockNum.toLocaleString('id-ID')} {item.base_unit?.symbol ?? ''}
                     </td>
                     <td>
@@ -185,9 +185,9 @@ export default function ItemsClient({
                     </td>
                     <td>
                       {item.is_active ? (
-                        <span className="text-sm text-green-700">Aktif</span>
+                        <span className="text-sm font-medium text-green-700 dark:text-green-400">Aktif</span>
                       ) : (
-                        <span className="text-sm text-gray-500">Nonaktif</span>
+                        <span className="text-sm text-gray-500 dark:text-slate-400">Nonaktif</span>
                       )}
                     </td>
                     <td className="text-right">
@@ -210,7 +210,7 @@ export default function ItemsClient({
       {/* Pagination */}
       {totalPages > 1 && (
         <nav className="mt-4 flex items-center justify-between" aria-label="Navigasi halaman">
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-slate-300">
             Halaman {page} dari {totalPages} ({totalCount} barang)
           </p>
           <div className="flex gap-2">

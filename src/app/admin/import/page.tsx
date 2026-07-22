@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 import ImportClient from './import-client'
 
 export const metadata: Metadata = {
@@ -9,8 +9,8 @@ export default function ImportPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Impor Data Barang</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Impor Data Barang</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Impor data barang secara massal dari file Excel (.xlsx) atau CSV (.csv).
           Unduh template terlebih dahulu untuk memastikan format kolom yang benar.
         </p>

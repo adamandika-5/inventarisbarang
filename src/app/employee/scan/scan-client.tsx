@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useTransition, useCallback } from 'react'
 import { BrowserMultiFormatReader } from '@zxing/browser'
 import { searchItemByCode, processEmployeeStockOut } from '../actions'
+import scanSuccessFeedback from '@/lib/scan-success-feedback'
 
 interface UnitOption {
   id: string
@@ -30,8 +31,56 @@ interface ItemData {
   }>
 }
 
+/**
+ * Safely check if a MediaStreamTrack supports torch/flash
+ */
+export function checkTrackTorchCapability(track: MediaStreamTrack | null | undefined): boolean {
+  if (!track || track.readyState !== 'live') return false
+  if (typeof track.getCapabilities !== 'function') return false
+  try {
+    const caps = track.getCapabilities() as { torch?: boolean }
+    return !!caps?.torch
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Safely apply torch constraint wrapped in try/catch to catch UnknownError "setPhotoOptions failed"
+ */
+export async function safeApplyTorchConstraint(
+  stream: MediaStream | null,
+  enable: boolean
+): Promise<boolean> {
+  if (!stream) return false
+  const videoTracks = stream.getVideoTracks()
+  let success = false
+
+  for (const track of videoTracks) {
+    if (track.readyState === 'live' && typeof track.getCapabilities === 'function') {
+      try {
+        const caps = track.getCapabilities() as { torch?: boolean }
+        if (caps?.torch) {
+          await track.applyConstraints({
+            advanced: [{ torch: enable } as MediaTrackConstraintSet],
+          })
+          success = true
+        }
+      } catch (err) {
+        console.warn('Torch constraint application failed non-fatally:', err)
+        success = false
+      }
+    }
+  }
+
+  return success
+}
+
+export type CameraStatus = 'idle' | 'starting' | 'running' | 'error'
+
 export default function ScanClient() {
-  const [cameraActive, setCameraActive] = useState(true)
+  const [userCameraEnabled, setUserCameraEnabled] = useState(true)
+  const [cameraStatus, setCameraStatus] = useState<CameraStatus>('idle')
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [manualQuery, setManualQuery] = useState('')
   const [searchLoading, setSearchLoading] = useState(false)
@@ -39,7 +88,14 @@ export default function ScanClient() {
   const [selectedUnit, setSelectedUnit] = useState<UnitOption | null>(null)
   const [quantity, setQuantity] = useState<string>('1')
   const [reason, setReason] = useState('')
-  const [, setTorchActive] = useState(false)
+  const [torchSupported, setTorchSupported] = useState(false)
+  const [torchActive, setTorchActive] = useState(false)
+
+  // Sound feedback toggle state
+  const [soundEnabled, setSoundEnabled] = useState(true)
+
+  // Single scan success feedback toast state
+  const [scanToast, setScanToast] = useState<string | null>(null)
 
   // Modals state
   const [showConfirmModal, setShowConfirmModal] = useState(false)
@@ -54,48 +110,40 @@ export default function ScanClient() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const videoRef = useRef<HTMLVideoElement>(null)
+  const activeSessionIdRef = useRef<number>(0)
   const controlsRef = useRef<{ stop: () => void } | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const isCleaningUpRef = useRef<boolean>(false)
+  const isTogglingTorchRef = useRef<boolean>(false)
   const isProcessingScanRef = useRef<boolean>(false)
   const lastScannedCodeRef = useRef<{ code: string; time: number }>({ code: '', time: 0 })
+  const scanFeedbackRef = useRef(scanSuccessFeedback)
   const cancelButtonRef = useRef<HTMLButtonElement>(null)
   const okButtonRef = useRef<HTMLButtonElement>(null)
 
   /**
-   * Centralized Camera & Torch Cleanup Function
+   * Reset session helper to re-enable vibration and scan callback processing
    */
-  const stopCamera = useCallback(async () => {
+  const resetScanSession = useCallback(() => {
+    scanFeedbackRef.current?.resetSession()
+    isProcessingScanRef.current = false
+    lastScannedCodeRef.current = { code: '', time: 0 }
+  }, [])
+
+  /**
+   * Centralized Camera & Torch Cleanup Function with session token validation
+   */
+  const stopCamera = useCallback(async (targetSessionId?: number) => {
+    if (targetSessionId !== undefined && targetSessionId !== activeSessionIdRef.current) {
+      return
+    }
+
+    activeSessionIdRef.current += 1
+
     if (isCleaningUpRef.current) return
     isCleaningUpRef.current = true
 
     try {
-      const videoEl = videoRef.current
-      const stream = (videoEl?.srcObject as MediaStream | null) || streamRef.current
-
-      if (stream) {
-        const videoTracks = stream.getVideoTracks()
-        for (const track of videoTracks) {
-          if (track.readyState === 'live') {
-            try {
-              await track.applyConstraints({
-                advanced: [{ torch: false } as MediaTrackConstraintSet],
-              })
-            } catch {
-              // Ignore if torch is not supported on this device/track
-            }
-          }
-        }
-
-        stream.getTracks().forEach((track) => {
-          try {
-            track.stop()
-          } catch {
-            // Ignore
-          }
-        })
-      }
-
       if (controlsRef.current) {
         try {
           controlsRef.current.stop()
@@ -103,6 +151,37 @@ export default function ScanClient() {
           // Ignore
         }
         controlsRef.current = null
+      }
+
+      const videoEl = videoRef.current
+      const stream = (videoEl?.srcObject as MediaStream | null) || streamRef.current
+
+      if (stream) {
+        const videoTracks = stream.getVideoTracks()
+        for (const track of videoTracks) {
+          if (track.readyState === 'live' && typeof track.getCapabilities === 'function') {
+            try {
+              const caps = track.getCapabilities() as { torch?: boolean }
+              if (caps?.torch) {
+                await track.applyConstraints({
+                  advanced: [{ torch: false } as MediaTrackConstraintSet],
+                })
+              }
+            } catch (err) {
+              console.warn('Torch cleanup error ignored non-fatally:', err)
+            }
+          }
+        }
+
+        stream.getTracks().forEach((track) => {
+          try {
+            if (track.readyState !== 'ended') {
+              track.stop()
+            }
+          } catch {
+            // Ignore
+          }
+        })
       }
 
       if (videoEl) {
@@ -116,31 +195,19 @@ export default function ScanClient() {
 
       streamRef.current = null
       setTorchActive(false)
-      setCameraActive(false)
+      setTorchSupported(false)
+      setCameraStatus('idle')
     } finally {
       isCleaningUpRef.current = false
     }
   }, [])
-
-  // Tab Visibility Change Cleanup
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'hidden' && cameraActive) {
-        stopCamera()
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
-    }
-  }, [cameraActive, stopCamera])
 
   // Lookup item by barcode / SKU / query
   const handleCodeLookup = useCallback(async (code: string) => {
     if (!code.trim() || searchLoading) return
     setSearchLoading(true)
     setErrorMsg(null)
+    setScanToast(null)
 
     const item = await searchItemByCode(code)
     setSearchLoading(false)
@@ -156,77 +223,222 @@ export default function ScanClient() {
         })
       }
       setQuantity('1')
+      setScanToast(`Barang ditemukan: ${item.name}`)
+
+      // Execute feedback immediately when item is found (sound + vibration [200, 80, 200] + banner)
+      scanFeedbackRef.current?.triggerSuccessFeedback({
+        soundEnabled,
+        vibrateDuration: [200, 80, 200],
+      })
     } else {
       setErrorMsg(`Barang dengan kode "${code}" tidak ditemukan atau tidak aktif.`)
     }
-  }, [searchLoading])
+  }, [searchLoading, soundEnabled])
 
-  // Camera Reader Initialization
+  /**
+   * Unified Single-Path Camera Startup with session generation token & frame readiness verification
+   */
+  const startCamera = useCallback(async () => {
+    activeSessionIdRef.current += 1
+    const sessionId = activeSessionIdRef.current
+    const t0 = performance.now()
+
+    setCameraStatus('starting')
+    setCameraError(null)
+
+    try {
+      if (!videoRef.current) {
+        await new Promise((r) => requestAnimationFrame(r))
+      }
+
+      const videoEl = videoRef.current
+      if (!videoEl || sessionId !== activeSessionIdRef.current) {
+        if (sessionId === activeSessionIdRef.current) setCameraStatus('idle')
+        return
+      }
+
+      if (controlsRef.current) {
+        try {
+          controlsRef.current.stop()
+        } catch {
+          // Ignore
+        }
+        controlsRef.current = null
+      }
+
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => {
+          try {
+            if (t.readyState !== 'ended') t.stop()
+          } catch {}
+        })
+        streamRef.current = null
+      }
+
+      // Step A: Fast MediaStream acquisition using navigator.mediaDevices.getUserMedia
+      const tGUMStart = performance.now()
+      console.warn(`[CameraPerf ${tGUMStart.toFixed(1)}ms] getUserMedia() starting`)
+
+      const constraints: MediaStreamConstraints = {
+        audio: false,
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
+          frameRate: { ideal: 30, max: 30 },
+        },
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia(constraints)
+      const tGUMDone = performance.now()
+      console.warn(`[CameraPerf ${tGUMDone.toFixed(1)}ms] getUserMedia() acquired in ${(tGUMDone - tGUMStart).toFixed(1)}ms`)
+
+      if (sessionId !== activeSessionIdRef.current) {
+        stream.getTracks().forEach((t) => t.stop())
+        return
+      }
+
+      streamRef.current = stream
+      videoEl.srcObject = stream
+
+      // Step B: Immediate video play & metadata readiness
+      const tPlayStart = performance.now()
+      if (videoEl.paused) {
+        try {
+          await videoEl.play()
+        } catch (playErr) {
+          console.warn('video.play() failed non-fatally:', playErr)
+        }
+      }
+      const tPlayDone = performance.now()
+      console.warn(`[CameraPerf ${tPlayDone.toFixed(1)}ms] video.play() finished in ${(tPlayDone - tPlayStart).toFixed(1)}ms`)
+
+      if (sessionId !== activeSessionIdRef.current) {
+        stream.getTracks().forEach((t) => t.stop())
+        videoEl.srcObject = null
+        return
+      }
+
+      // Step C: Set UI state to running immediately so camera preview appears in < 1-2s!
+      const videoTrack = stream.getVideoTracks()[0]
+      const hasTorch = checkTrackTorchCapability(videoTrack)
+      setTorchSupported(hasTorch)
+      setTorchActive(false)
+      setCameraStatus('running')
+
+      const tRunning = performance.now()
+      console.warn(`[CameraPerf ${tRunning.toFixed(1)}ms] Camera preview LIVE in ${(tRunning - t0).toFixed(1)}ms total!`)
+
+      // Step D: Attach ZXing decoder to already playing video element in background (non-blocking)
+      const tDecoderStart = performance.now()
+      const codeReader = new BrowserMultiFormatReader()
+
+      const controls = await codeReader.decodeFromVideoElement(
+        videoEl,
+        async (result, error) => {
+          if (result && sessionId === activeSessionIdRef.current && !isProcessingScanRef.current) {
+            const code = result.getText().trim()
+            const now = Date.now()
+
+            if (
+              lastScannedCodeRef.current.code === code &&
+              now - lastScannedCodeRef.current.time < 2000
+            ) {
+              return
+            }
+
+            isProcessingScanRef.current = true
+            lastScannedCodeRef.current = { code, time: now }
+
+            handleCodeLookup(code)
+            await stopCamera(sessionId)
+            isProcessingScanRef.current = false
+          }
+          if (error && !(error.name === 'NotFoundException')) {
+            // Ignore standard frame decoding errors
+          }
+        }
+      )
+
+      const tDecoderDone = performance.now()
+      console.warn(`[CameraPerf ${tDecoderDone.toFixed(1)}ms] ZXing decoder attached in ${(tDecoderDone - tDecoderStart).toFixed(1)}ms`)
+
+      if (sessionId !== activeSessionIdRef.current) {
+        controls.stop()
+      } else {
+        controlsRef.current = controls
+      }
+    } catch (err: unknown) {
+      if (sessionId === activeSessionIdRef.current) {
+        const errObj = err as Error
+        console.error('Camera startup error:', errObj?.name, errObj?.message || err)
+        const msg =
+          errObj?.name === 'NotAllowedError' || errObj?.name === 'PermissionDeniedError'
+            ? 'Izin kamera ditolak oleh pengguna/browser.'
+            : errObj?.name === 'NotReadableError' || errObj?.name === 'TrackStartError'
+            ? 'Kamera sedang digunakan oleh aplikasi lain atau tidak dapat diakses.'
+            : 'Kamera tidak dapat diaktifkan. Silakan gunakan pencarian manual.'
+
+        setCameraError(msg)
+        setCameraStatus('error')
+        await stopCamera(sessionId)
+      }
+    }
+  }, [stopCamera, handleCodeLookup])
+
+  // Single Reactive Camera Lifecycle Effect
   useEffect(() => {
-    let isMounted = true
+    if (userCameraEnabled && !selectedItem && !showConfirmModal && !successModalData) {
+      startCamera()
+    } else {
+      stopCamera()
+    }
 
-    async function initCamera() {
-      if (!cameraActive || selectedItem || showConfirmModal || successModalData) return
+    return () => {
+      stopCamera()
+    }
+  }, [userCameraEnabled, selectedItem, showConfirmModal, successModalData, startCamera, stopCamera])
 
-      try {
-        setCameraError(null)
-        const codeReader = new BrowserMultiFormatReader()
+  // Toggle Torch/Flash Handler
+  const handleToggleFlash = async () => {
+    scanFeedbackRef.current?.prepareAudio()
+    if (isTogglingTorchRef.current || isCleaningUpRef.current || cameraStatus !== 'running' || !torchSupported) return
+    isTogglingTorchRef.current = true
 
-        if (!videoRef.current) return
+    try {
+      const stream = streamRef.current || (videoRef.current?.srcObject as MediaStream | null)
+      if (!stream) return
 
-        const controls = await codeReader.decodeFromConstraints(
-          { video: { facingMode: 'environment' } },
-          videoRef.current,
-          async (result, error) => {
-            if (result && isMounted && !isProcessingScanRef.current) {
-              const code = result.getText().trim()
-              const now = Date.now()
+      const nextState = !torchActive
+      const applied = await safeApplyTorchConstraint(stream, nextState)
 
-              if (
-                lastScannedCodeRef.current.code === code &&
-                now - lastScannedCodeRef.current.time < 2000
-              ) {
-                return
-              }
+      if (applied) {
+        setTorchActive(nextState)
+      } else {
+        setTorchActive(false)
+        setTorchSupported(false)
+        setCameraError('Flash tidak tersedia pada perangkat ini')
+      }
+    } finally {
+      isTogglingTorchRef.current = false
+    }
+  }
 
-              isProcessingScanRef.current = true
-              lastScannedCodeRef.current = { code, time: now }
-
-              // Await full camera & torch cleanup BEFORE setting selectedItem
-              await stopCamera()
-
-              await handleCodeLookup(code)
-              isProcessingScanRef.current = false
-            }
-            if (error && !(error.name === 'NotFoundException')) {
-              // Ignore standard frame decoding errors
-            }
-          }
-        )
-
-        if (isMounted) {
-          controlsRef.current = controls
-          if (videoRef.current?.srcObject) {
-            streamRef.current = videoRef.current.srcObject as MediaStream
-          }
-        } else {
-          controls.stop()
-        }
-      } catch {
-        if (isMounted) {
-          setCameraError('Kamera tidak tersedia atau izin ditolak. Silakan gunakan pencarian manual di bawah.')
-          setCameraActive(false)
-        }
+  // Tab Visibility Change Listener
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') {
+        stopCamera()
+      } else if (document.visibilityState === 'visible' && userCameraEnabled && !selectedItem && !showConfirmModal && !successModalData) {
+        startCamera()
       }
     }
 
-    initCamera()
-
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     return () => {
-      isMounted = false
-      stopCamera()
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [cameraActive, selectedItem, showConfirmModal, successModalData, handleCodeLookup, stopCamera])
+  }, [userCameraEnabled, selectedItem, showConfirmModal, successModalData, startCamera, stopCamera])
 
   // Focus management on modal open
   useEffect(() => {
@@ -276,7 +488,7 @@ export default function ScanClient() {
       ]
     : []
 
-  // Dynamic Quantity Parsing & Validation (String -> Number evaluation on demand)
+  // Dynamic Quantity Parsing & Validation
   const parsedQty = parseInt(quantity.trim(), 10)
   const isValidQty = !isNaN(parsedQty) && parsedQty > 0
   const conversionFactor = selectedUnit?.conversion_factor ?? 1
@@ -285,7 +497,7 @@ export default function ScanClient() {
   const estimatedRemainingStock = currentStockNum - baseQuantityNeeded
   const isStockSufficient = isValidQty && currentStockNum >= baseQuantityNeeded
 
-  // Open confirmation modal (does NOT call RPC; validates quantity input as string first)
+  // Open confirmation modal (does NOT call RPC)
   const handleOpenConfirmation = (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedItem || !selectedUnit) return
@@ -348,23 +560,42 @@ export default function ScanClient() {
     })
   }
 
-  // Handle OK on Success Modal -> Resets form & re-enables scanner
+  // Handle OK on Success Modal -> Resets form & session & re-enables scanner
   const handleSuccessOk = () => {
+    resetScanSession()
     setSuccessModalData(null)
     setSelectedItem(null)
     setSelectedUnit(null)
     setQuantity('1')
     setReason('')
     setErrorMsg(null)
+    setScanToast(null)
     setManualQuery('')
-    setCameraActive(true)
+    setUserCameraEnabled(true)
+  }
+
+  // Reset session when "Nyalakan Kamera" or "Scan Lagi" (Ganti Barang) is clicked
+  const handleResetSessionAndCamera = async () => {
+    resetScanSession()
+    await stopCamera()
+    setSelectedItem(null)
+    setSelectedUnit(null)
+    setQuantity('1')
+    setReason('')
+    setErrorMsg(null)
+    setScanToast(null)
+    setManualQuery('')
+    setUserCameraEnabled(true)
   }
 
   const handleToggleCamera = async () => {
-    if (cameraActive) {
+    resetScanSession()
+    if (cameraStatus === 'running' || cameraStatus === 'starting' || userCameraEnabled) {
+      setUserCameraEnabled(false)
       await stopCamera()
     } else {
-      setCameraActive(true)
+      setUserCameraEnabled(true)
+      await startCamera()
     }
   }
 
@@ -382,43 +613,89 @@ export default function ScanClient() {
         <div className="card space-y-6">
           <div>
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-gray-900">Pemindai Kamera</h2>
-              <button
-                type="button"
-                onClick={handleToggleCamera}
-                className="text-xs font-medium text-primary-600 hover:underline"
-              >
-                {cameraActive ? 'Matikan Kamera' : 'Nyalakan Kamera'}
-              </button>
+              <h2 className="text-sm font-semibold text-slate-900 dark:text-slate-100">Pemindai Kamera</h2>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setSoundEnabled((prev) => !prev)}
+                  className="text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
+                  aria-label={soundEnabled ? 'Matikan suara feedback' : 'Aktifkan suara feedback'}
+                >
+                  {soundEnabled ? '🔔 Suara: Aktif' : '🔕 Suara: Nonaktif'}
+                </button>
+
+                {cameraStatus === 'running' && torchSupported && (
+                  <button
+                    type="button"
+                    onClick={handleToggleFlash}
+                    disabled={isTogglingTorchRef.current}
+                    className="text-xs font-medium text-amber-600 hover:underline disabled:opacity-50"
+                  >
+                    {torchActive ? 'Matikan Flash' : 'Nyalakan Flash'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleToggleCamera}
+                  disabled={cameraStatus === 'starting'}
+                  className="text-xs font-medium text-primary-600 hover:underline disabled:opacity-50"
+                >
+                  {cameraStatus === 'starting'
+                    ? '⏳ Menyiapkan...'
+                    : cameraStatus === 'running'
+                    ? 'Matikan Kamera'
+                    : 'Nyalakan Kamera'}
+                </button>
+              </div>
             </div>
 
-            {cameraActive ? (
-              <div className="relative overflow-hidden rounded-xl bg-black shadow-inner">
-                <video ref={videoRef} className="h-64 w-full object-cover" playsInline muted />
-                <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                  <div className="h-40 w-64 rounded-lg border-2 border-dashed border-white/80 shadow-2xl" />
-                </div>
-                <div className="absolute bottom-2 left-0 right-0 text-center text-xs text-white/80">
-                  Arahkan barcode barang ke area bingkai
-                </div>
-              </div>
-            ) : (
-              <div className="flex h-32 items-center justify-center rounded-xl bg-gray-100 text-xs text-gray-500">
-                Kamera dinonaktifkan. Gunakan pencarian manual di bawah.
-              </div>
-            )}
+            <div className="relative overflow-hidden rounded-xl bg-black shadow-inner min-h-[16rem]">
+              <video
+                ref={videoRef}
+                className={`h-64 w-full object-cover ${cameraStatus === 'running' ? 'block' : 'hidden'}`}
+                autoPlay
+                playsInline
+                muted
+              />
 
-            {cameraError && <p className="mt-2 text-xs text-amber-600">{cameraError}</p>}
+              {cameraStatus === 'running' && (
+                <>
+                  <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                    <div className="h-40 w-64 rounded-lg border-2 border-dashed border-white/80 shadow-2xl" />
+                  </div>
+                  <div className="absolute bottom-2 left-0 right-0 text-center text-xs text-white/80">
+                    Arahkan barcode barang ke area bingkai
+                  </div>
+                </>
+              )}
+
+              {cameraStatus === 'starting' && (
+                <div className="flex h-64 items-center justify-center text-sm font-medium text-slate-300">
+                  <svg className="mr-2 h-5 w-5 animate-spin text-white" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                  </svg>
+                  Menyiapkan kamera...
+                </div>
+              )}
+
+              {(cameraStatus === 'idle' || cameraStatus === 'error' || !userCameraEnabled) && (
+                <div className="flex h-64 items-center justify-center p-4 text-center text-xs text-slate-400">
+                  {cameraError ? cameraError : 'Kamera dinonaktifkan. Klik "Nyalakan Kamera" atau gunakan pencarian manual.'}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="relative flex items-center justify-center">
-            <div className="w-full border-t border-gray-200" />
-            <span className="absolute bg-white px-3 text-xs font-medium text-gray-400">atau</span>
+            <div className="w-full border-t border-slate-200 dark:border-slate-700" />
+            <span className="absolute bg-white px-3 text-xs font-medium text-slate-400 dark:bg-slate-800 dark:text-slate-500">atau</span>
           </div>
 
           <form
             onSubmit={(e) => {
               e.preventDefault()
+              resetScanSession()
               handleCodeLookup(manualQuery)
             }}
             className="space-y-3"
@@ -452,34 +729,42 @@ export default function ScanClient() {
       {/* Item Selected Form */}
       {selectedItem && (
         <form onSubmit={handleOpenConfirmation} className="card space-y-6">
-          <div className="flex items-start justify-between border-b border-gray-100 pb-4">
+          {/* Scan Success Toast Banner */}
+          {scanToast && (
+            <div
+              role="status"
+              className="flex items-center gap-2 rounded-lg bg-emerald-50 p-4 text-sm font-medium text-emerald-800 border border-emerald-200 shadow-sm"
+            >
+              <svg className="h-5 w-5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+              <span>{scanToast}</span>
+            </div>
+          )}
+
+          <div className="flex items-start justify-between border-b pb-4" style={{ borderColor: 'var(--border-muted)' }}>
             <div>
               <span className="inline-block rounded bg-primary-100 px-2 py-0.5 text-xs font-semibold text-primary-800">
                 BARANG DITEMUKAN
               </span>
-              <h2 className="mt-1 text-xl font-bold text-gray-900">{selectedItem.name}</h2>
-              <p className="font-mono text-xs text-gray-500">
+              <h2 className="mt-1 text-xl font-bold text-slate-900 dark:text-slate-100">{selectedItem.name}</h2>
+              <p className="font-mono text-xs text-slate-500 dark:text-slate-400">
                 SKU: {selectedItem.sku} · Barcode: {selectedItem.barcode}
               </p>
             </div>
             <button
               type="button"
-              onClick={async () => {
-                await stopCamera()
-                setSelectedItem(null)
-                setSelectedUnit(null)
-                setCameraActive(true)
-              }}
-              className="text-xs text-gray-500 hover:text-gray-700"
+              onClick={handleResetSessionAndCamera}
+              className="text-xs text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
             >
               Ganti Barang
             </button>
           </div>
 
-          <div className="rounded-lg bg-gray-50 p-4">
+          <div className="rounded-lg bg-slate-50 p-4 dark:bg-slate-700/60">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-500">Stok Tersedia Saat Ini:</span>
-              <span className="text-lg font-bold text-gray-900">
+              <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Stok Tersedia Saat Ini:</span>
+              <span className="text-lg font-bold text-slate-900 dark:text-slate-100">
                 {currentStockNum.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol ?? ''}
               </span>
             </div>
@@ -551,15 +836,10 @@ export default function ScanClient() {
             />
           </div>
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+          <div className="flex justify-end gap-3 border-t pt-2" style={{ borderColor: 'var(--border-muted)' }}>
             <button
               type="button"
-              onClick={async () => {
-                await stopCamera()
-                setSelectedItem(null)
-                setSelectedUnit(null)
-                setCameraActive(true)
-              }}
+              onClick={handleResetSessionAndCamera}
               className="btn-secondary"
             >
               Batal
@@ -585,22 +865,22 @@ export default function ScanClient() {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
         >
           <div className="w-full max-w-md card space-y-4 shadow-2xl">
-            <h3 id="confirm-modal-title" className="text-lg font-bold text-gray-900">
+            <h3 id="confirm-modal-title" className="text-lg font-bold text-slate-900 dark:text-slate-100">
               Konfirmasi Pengambilan
             </h3>
 
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-slate-700 dark:text-slate-300">
               Yakin ingin mengambil <strong>{quantity} {selectedUnit.symbol} {selectedItem.name}</strong>?
             </p>
 
-            <div className="rounded-lg bg-gray-50 p-3 text-xs space-y-1 text-gray-600">
+            <div className="rounded-lg bg-slate-50 p-3 text-xs space-y-1 text-slate-600 dark:bg-slate-700/60 dark:text-slate-300">
               <div className="flex justify-between">
                 <span>Stok saat ini:</span>
-                <span className="font-semibold text-gray-900">{currentStockNum} {selectedItem.base_unit?.symbol}</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">{currentStockNum} {selectedItem.base_unit?.symbol}</span>
               </div>
               <div className="flex justify-between">
                 <span>Perkiraan sisa stok:</span>
-                <span className={`font-semibold ${estimatedRemainingStock < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
+                <span className={`font-semibold ${estimatedRemainingStock < 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                   {estimatedRemainingStock} {selectedItem.base_unit?.symbol}
                 </span>
               </div>
@@ -655,26 +935,26 @@ export default function ScanClient() {
               </svg>
             </div>
 
-            <h3 id="success-modal-title" className="text-lg font-bold text-gray-900">
+            <h3 id="success-modal-title" className="text-lg font-bold text-slate-900 dark:text-slate-100">
               Berhasil Disimpan
             </h3>
 
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-slate-600 dark:text-slate-300">
               Pengambilan barang berhasil dicatat.
             </p>
 
-            <div className="rounded-lg bg-gray-50 p-3 text-xs space-y-1 text-left text-gray-700">
+            <div className="rounded-lg bg-slate-50 p-3 text-xs space-y-1 text-left text-slate-700 dark:bg-slate-700/60 dark:text-slate-300">
               <div className="flex justify-between">
                 <span>No. Transaksi:</span>
-                <span className="font-mono font-bold text-gray-900">{successModalData.transactionNumber}</span>
+                <span className="font-mono font-bold text-slate-900 dark:text-slate-100">{successModalData.transactionNumber}</span>
               </div>
               <div className="flex justify-between">
                 <span>Jumlah Diambil:</span>
-                <span className="font-semibold text-gray-900">{successModalData.quantityText}</span>
+                <span className="font-semibold text-slate-900 dark:text-slate-100">{successModalData.quantityText}</span>
               </div>
               <div className="flex justify-between">
                 <span>Sisa Stok Terbaru:</span>
-                <span className="font-bold text-emerald-700">{successModalData.newStock}</span>
+                <span className="font-bold text-emerald-600 dark:text-emerald-400">{successModalData.newStock}</span>
               </div>
             </div>
 

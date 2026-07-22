@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import SettingsForm from './settings-form'
 
@@ -18,8 +18,8 @@ export default async function SettingsPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Pengaturan Aplikasi</h1>
-        <p className="mt-1 text-sm text-gray-500">Konfigurasi nama instansi dan preferensi laporan</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Pengaturan Aplikasi</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Konfigurasi nama instansi dan preferensi laporan</p>
       </div>
       <SettingsForm settings={settings} />
     </div>

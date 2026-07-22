@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import AuditLogClient from './audit-log-client'
 
@@ -39,8 +39,8 @@ export default async function AuditLogPage({
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Audit Log</h1>
-        <p className="mt-1 text-sm text-gray-500">Riwayat lengkap tindakan admin</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Audit Log</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Riwayat lengkap tindakan admin</p>
       </div>
       <AuditLogClient
         logs={logs ?? []}

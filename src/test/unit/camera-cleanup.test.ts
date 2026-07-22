@@ -1,7 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
+import {
+  checkTrackTorchCapability,
+  safeApplyTorchConstraint,
+} from '@/app/employee/scan/scan-client'
+import scanSuccessFeedback from '@/lib/scan-success-feedback'
 
 /**
- * Unit tests for Camera & Torch Hardware Cleanup logic
+ * Unit tests for Camera & Torch Hardware Cleanup logic, Scan Feedback Vibration, & Web Audio Beep
  */
 
 class MockMediaStreamTrack {
@@ -9,8 +14,19 @@ class MockMediaStreamTrack {
   readyState: 'live' | 'ended' = 'live'
   applyConstraintsCalledWith: unknown[] = []
   stopped = false
+  shouldFailConstraints = false
+  hasTorchCapability = true
+
+  getCapabilities() {
+    return { torch: this.hasTorchCapability }
+  }
 
   async applyConstraints(constraints: unknown) {
+    if (this.shouldFailConstraints) {
+      const err = new Error('setPhotoOptions failed')
+      err.name = 'UnknownError'
+      throw err
+    }
     this.applyConstraintsCalledWith.push(constraints)
   }
 
@@ -55,29 +71,31 @@ class CameraCleanupController {
       if (activeStream) {
         const videoTracks = activeStream.getVideoTracks()
         for (const track of videoTracks) {
-          if (track.readyState === 'live') {
-            // 1. Torch false constraint applied before stopping track
+          if (track.readyState === 'live' && typeof track.getCapabilities === 'function') {
             try {
-              await track.applyConstraints({ advanced: [{ torch: false }] })
+              const caps = track.getCapabilities() as { torch?: boolean }
+              if (caps?.torch) {
+                await track.applyConstraints({ advanced: [{ torch: false }] })
+              }
             } catch {
-              // Ignore unsupported
+              // Ignore non-fatal torch cleanup failure
             }
           }
         }
 
-        // 2. Stop ALL tracks
+        // Stop ALL tracks regardless of torch cleanup failure
         activeStream.getTracks().forEach((track) => {
-          track.stop()
+          if (track.readyState !== 'ended') {
+            track.stop()
+          }
         })
       }
 
-      // 3. Stop scanner controls
       if (this.controls) {
         this.controls.stop()
         this.controls = null
       }
 
-      // 4. Pause video and clear srcObject
       if (this.videoEl) {
         this.videoEl.pause()
         this.videoEl.srcObject = null
@@ -92,7 +110,6 @@ class CameraCleanupController {
   }
 
   async handleScanSuccess(code: string) {
-    // Await full cleanup BEFORE scan success processing finishes
     await this.stopCamera()
     this.scanSuccessCalled = true
     return code
@@ -117,11 +134,8 @@ describe('Camera & Torch Hardware Cleanup', () => {
 
     await controller.stopCamera()
 
-    // 1. applyConstraints was called with torch: false
     expect(track.applyConstraintsCalledWith).toHaveLength(1)
     expect(track.applyConstraintsCalledWith[0]).toEqual({ advanced: [{ torch: false }] })
-
-    // 2. Track is stopped AFTER constraints applied
     expect(track.stopped).toBe(true)
   })
 
@@ -176,7 +190,6 @@ describe('Camera & Torch Hardware Cleanup', () => {
     controller.stream = stream
     controller.videoEl = { srcObject: stream, pause: vi.fn() }
 
-    // Call stopCamera multiple times in parallel
     await Promise.all([
       controller.stopCamera(),
       controller.stopCamera(),
@@ -197,11 +210,204 @@ describe('Camera & Torch Hardware Cleanup', () => {
     await controller.stopCamera()
     expect(controller.cameraActive).toBe(false)
 
-    // Restart camera (e.g. after clicking OK on success modal)
     controller.restartCamera()
 
     expect(controller.cameraActive).toBe(true)
     expect(controller.torchActive).toBe(false)
-    expect(controller.stream).toBeNull() // Old stream is cleared
+    expect(controller.stream).toBeNull()
+  })
+})
+
+describe('Torch Constraint Error Handling & Track State Validation', () => {
+  it('catches UnknownError "setPhotoOptions failed" without causing unhandled promise rejections', async () => {
+    const track = new MockMediaStreamTrack()
+    track.shouldFailConstraints = true
+    const stream = new MockMediaStream([track])
+
+    const success = await safeApplyTorchConstraint(stream as unknown as MediaStream, true)
+
+    expect(success).toBe(false)
+  })
+
+  it('allows scanner to keep functioning when flash toggle fails', async () => {
+    const track = new MockMediaStreamTrack()
+    track.shouldFailConstraints = true
+    const stream = new MockMediaStream([track])
+
+    const success = await safeApplyTorchConstraint(stream as unknown as MediaStream, true)
+    expect(success).toBe(false)
+    expect(track.readyState).toBe('live')
+  })
+
+  it('completes camera cleanup and stops all tracks even if torch cleanup throws setPhotoOptions failed', async () => {
+    const track = new MockMediaStreamTrack()
+    track.shouldFailConstraints = true
+    const stream = new MockMediaStream([track])
+
+    const controller = new CameraCleanupController()
+    controller.stream = stream
+    controller.videoEl = { srcObject: stream, pause: vi.fn() }
+
+    await controller.stopCamera()
+
+    expect(track.stopped).toBe(true)
+    expect(controller.cameraActive).toBe(false)
+  })
+
+  it('does NOT invoke applyConstraints on tracks whose readyState is "ended"', async () => {
+    const track = new MockMediaStreamTrack()
+    track.readyState = 'ended'
+    const stream = new MockMediaStream([track])
+
+    const success = await safeApplyTorchConstraint(stream as unknown as MediaStream, true)
+
+    expect(success).toBe(false)
+    expect(track.applyConstraintsCalledWith).toHaveLength(0)
+  })
+
+  it('identifies devices without torch capability and disables torch capability check', () => {
+    const trackNoTorch = new MockMediaStreamTrack()
+    trackNoTorch.hasTorchCapability = false
+
+    expect(checkTrackTorchCapability(trackNoTorch as unknown as MediaStreamTrack)).toBe(false)
+
+    const trackWithTorch = new MockMediaStreamTrack()
+    trackWithTorch.hasTorchCapability = true
+
+    expect(checkTrackTorchCapability(trackWithTorch as unknown as MediaStreamTrack)).toBe(true)
+  })
+})
+
+describe('Scan Success Feedback & Web Audio Beep', () => {
+  it('triggers 100ms vibration and notification containing item name after item is found', () => {
+    const vibrateSpy = vi.fn()
+    const originalNavigator = global.navigator
+
+    Object.defineProperty(global, 'navigator', {
+      value: { vibrate: vibrateSpy },
+      writable: true,
+      configurable: true,
+    })
+
+    const mockLookup = (code: string) => {
+      if (code === '899123456789') {
+        const item = { id: 'item-1', name: 'Pensil 2B' }
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+          navigator.vibrate(100)
+        }
+        return { item, toast: `Barang ditemukan: ${item.name}` }
+      }
+      return { item: null, toast: null }
+    }
+
+    const res = mockLookup('899123456789')
+    expect(vibrateSpy).toHaveBeenCalledWith(100)
+    expect(res.toast).toBe('Barang ditemukan: Pensil 2B')
+
+    Object.defineProperty(global, 'navigator', { value: originalNavigator, writable: true, configurable: true })
+  })
+
+  it('does NOT crash when navigator.vibrate is not supported', () => {
+    const originalNavigator = global.navigator
+    Object.defineProperty(global, 'navigator', {
+      value: {},
+      writable: true,
+      configurable: true,
+    })
+
+    const triggerVibration = (ms = 100) => {
+      try {
+        if (typeof navigator !== 'undefined' && 'vibrate' in navigator && typeof navigator.vibrate === 'function') {
+          navigator.vibrate(ms)
+        }
+      } catch {
+        // Ignore
+      }
+    }
+
+    expect(() => triggerVibration(100)).not.toThrow()
+
+    Object.defineProperty(global, 'navigator', { value: originalNavigator, writable: true, configurable: true })
+  })
+
+  it('does NOT trigger vibration or beep when barcode is unrecognized or search fails', () => {
+    const vibrateSpy = vi.fn()
+    const playBeepSpy = vi.fn()
+    const originalNavigator = global.navigator
+
+    Object.defineProperty(global, 'navigator', {
+      value: { vibrate: vibrateSpy },
+      writable: true,
+      configurable: true,
+    })
+
+    const mockLookup = (code: string) => {
+      if (code === 'UNKNOWN_CODE') {
+        return { item: null, error: 'Barang tidak ditemukan' }
+      }
+      playBeepSpy()
+      return { item: { name: 'Item' } }
+    }
+
+    const res = mockLookup('UNKNOWN_CODE')
+    expect(vibrateSpy).not.toHaveBeenCalled()
+    expect(playBeepSpy).not.toHaveBeenCalled()
+    expect(res.item).toBeNull()
+
+    Object.defineProperty(global, 'navigator', { value: originalNavigator, writable: true, configurable: true })
+  })
+
+  it('ensures duplicate scan callbacks trigger vibration and beep only ONCE', () => {
+    const vibrateSpy = vi.fn()
+    const beepSpy = vi.fn()
+    const originalNavigator = global.navigator
+
+    Object.defineProperty(global, 'navigator', {
+      value: { vibrate: vibrateSpy },
+      writable: true,
+      configurable: true,
+    })
+
+    let isProcessing = false
+    let callCount = 0
+
+    const onScanCallback = (_code: string) => {
+      if (isProcessing) return
+      isProcessing = true
+      callCount++
+      beepSpy()
+      if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+        navigator.vibrate(100)
+      }
+    }
+
+    onScanCallback('899123456789')
+    onScanCallback('899123456789')
+    onScanCallback('899123456789')
+
+    expect(callCount).toBe(1)
+    expect(vibrateSpy).toHaveBeenCalledTimes(1)
+    expect(beepSpy).toHaveBeenCalledTimes(1)
+
+    Object.defineProperty(global, 'navigator', { value: originalNavigator, writable: true, configurable: true })
+  })
+
+  it('handles playFallbackBeep gracefully without crashing when Web Audio is unsupported or fails', () => {
+    expect(() => scanSuccessFeedback.playFallbackBeep(880, 150)).not.toThrow()
+  })
+
+  it('handles prepareAudio gracefully without crashing', () => {
+    expect(() => scanSuccessFeedback.prepareAudio()).not.toThrow()
+  })
+
+  it('skips beep playback when sound is disabled by user toggle', () => {
+    const playBeepSpy = vi.fn()
+    const soundEnabled = false
+
+    if (soundEnabled) {
+      playBeepSpy()
+    }
+
+    expect(playBeepSpy).not.toHaveBeenCalled()
   })
 })

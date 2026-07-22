@@ -248,7 +248,7 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
                   className="input"
                 />
                 {selectedUnit && (
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     = {baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}
                   </p>
                 )}
@@ -260,7 +260,7 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
                   Harga per {selectedUnit?.symbol ?? 'satuan'} <span className="text-red-500">*</span>
                 </label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-gray-500">Rp</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400">Rp</span>
                   <input
                     id="stock-in-price"
                     type="text"
@@ -279,7 +279,7 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
                   />
                 </div>
                 {totalCost > 0 && (
-                  <p className="mt-1 text-xs text-gray-500">
+                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     Total: {formatRp(totalCost)}
                   </p>
                 )}
@@ -287,9 +287,9 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
 
               {/* Simulation summary */}
               {simulation && (
-                <div className="rounded-md bg-gray-50 p-3 text-sm">
-                  <p className="font-medium text-gray-700">Ringkasan Transaksi (Simulasi)</p>
-                  <div className="mt-2 space-y-1 text-gray-600">
+                <div className="rounded-md bg-slate-50 p-3 text-sm dark:bg-slate-700/60">
+                  <p className="font-medium text-slate-700 dark:text-slate-200">Ringkasan Transaksi (Simulasi)</p>
+                  <div className="mt-2 space-y-1 text-slate-600 dark:text-slate-300">
                     <div className="flex justify-between">
                       <span>Jumlah (satuan dasar)</span>
                       <span>{simulation.baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</span>
@@ -300,9 +300,9 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
                     </div>
                     <div className="flex justify-between">
                       <span>Perkiraan stok baru</span>
-                      <span className="font-medium">{simulation.newStock.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</span>
+                      <span className="font-medium text-slate-900 dark:text-slate-100">{simulation.newStock.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</span>
                     </div>
-                    <p className="text-xs text-gray-400 mt-1">* Harga rata-rata baru dihitung ulang oleh server.</p>
+                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">* Harga rata-rata baru dihitung ulang oleh server.</p>
                   </div>
                 </div>
               )}
@@ -338,11 +338,11 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
           aria-modal="true"
           aria-labelledby="confirm-title"
         >
-          <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-xl">
-            <h2 id="confirm-title" className="text-lg font-semibold text-gray-900">
+          <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-slate-800">
+            <h2 id="confirm-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               Konfirmasi Barang Masuk
             </h2>
-            <div className="mt-3 space-y-2 text-sm text-gray-700">
+            <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-300">
               <p><span className="font-medium">Barang:</span> {selectedItem.name}</p>
               <p><span className="font-medium">Jumlah:</span> {quantity} {selectedUnit.symbol} = {baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
               <p><span className="font-medium">Harga per {selectedUnit.symbol}:</span> {formatRp(parseFloat(price) || 0)}</p>

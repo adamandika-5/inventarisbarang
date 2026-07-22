@@ -47,7 +47,7 @@ export default function SettingsForm({ settings }: { settings: AppSettings | nul
             className="input"
             placeholder="Contoh: Universitas Pesantren Tinggi Darul Ulum Jombang"
           />
-          <p className="mt-1 text-xs text-gray-500">Ditampilkan di header laporan.</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Ditampilkan di header laporan.</p>
         </div>
 
         <div>
@@ -77,13 +77,13 @@ export default function SettingsForm({ settings }: { settings: AppSettings | nul
             defaultValue={settings?.default_barcode_label_count ?? 1}
             className="input w-32"
           />
-          <p className="mt-1 text-xs text-gray-500">Nilai default saat mencetak label barcode (1–500).</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Nilai default saat mencetak label barcode (1–500).</p>
         </div>
 
-        <hr className="border-gray-100" />
+        <hr className="border-slate-100 dark:border-slate-700" />
 
-        <div className="rounded-md bg-gray-50 p-3 text-sm text-gray-600">
-          <p className="font-medium text-gray-700">Nilai Tetap (Tidak Dapat Diubah)</p>
+        <div className="rounded-md bg-slate-50 p-3 text-sm text-slate-600 dark:bg-slate-700/50 dark:text-slate-300">
+          <p className="font-medium text-slate-700 dark:text-slate-200">Nilai Tetap (Tidak Dapat Diubah)</p>
           <ul className="mt-2 space-y-1 text-xs">
             <li>Nama Aplikasi: <strong>InventarisBarang</strong></li>
             <li>Zona Waktu: <strong>Asia/Jakarta (WIB)</strong></li>

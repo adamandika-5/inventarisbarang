@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
   title: 'Dashboard Admin — InventarisBarang',
@@ -11,8 +11,8 @@ export const metadata: Metadata = {
 export default function AdminDashboardPage() {
   return (
     <div className="p-6">
-      <h1 className="text-2xl font-bold text-gray-900">Dashboard Admin</h1>
-      <p className="mt-2 text-gray-500">
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Dashboard Admin</h1>
+      <p className="mt-2 text-slate-500 dark:text-slate-400">
         Selamat datang di panel admin InventarisBarang.
       </p>
       {/* TODO: Implement dashboard metrics and charts in Milestone 6 */}

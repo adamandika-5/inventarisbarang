@@ -104,7 +104,7 @@ const TYPE_CLASSES: Record<TransactionType, string> = {
   INITIAL: 'bg-blue-100 text-blue-800',
   ADJUSTMENT_IN: 'bg-emerald-100 text-emerald-800',
   ADJUSTMENT_OUT: 'bg-orange-100 text-orange-800',
-  REVERSAL: 'bg-gray-100 text-gray-700',
+  REVERSAL: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
 }
 
 // ── CSV safety ─────────────────────────────────────────────────────────────────
@@ -239,7 +239,7 @@ export default function ReportsClient({
     <div className="space-y-6">
       {/* Filter bar */}
       <div className="card">
-        <h2 className="mb-3 text-sm font-semibold text-gray-900">Filter Laporan</h2>
+        <h2 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Filter Laporan</h2>
         <div className="flex flex-wrap items-end gap-3">
           <div>
             <label htmlFor="filter-from" className="label mb-1">
@@ -331,9 +331,9 @@ export default function ReportsClient({
       {/* Transactions table */}
       <div className="card">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-gray-900">
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
             Riwayat Transaksi
-            <span className="ml-2 text-sm font-normal text-gray-500">
+            <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
               ({totalCount.toLocaleString('id-ID')} total)
             </span>
           </h2>
@@ -352,8 +352,8 @@ export default function ReportsClient({
         </div>
 
         {transactions.length === 0 ? (
-          <div className="rounded-md border border-dashed border-gray-300 py-12 text-center">
-            <p className="text-sm text-gray-500">Tidak ada transaksi dalam rentang tanggal ini.</p>
+          <div className="rounded-md border border-dashed border-slate-300 py-12 text-center dark:border-slate-700">
+            <p className="text-sm text-slate-500 dark:text-slate-400">Tidak ada transaksi dalam rentang tanggal ini.</p>
           </div>
         ) : (
           <>
@@ -374,42 +374,41 @@ export default function ReportsClient({
                 <tbody>
                   {transactions.map((tx) => (
                     <tr key={tx.id} className={tx.is_reversed ? 'opacity-50' : ''}>
-                      <td className="font-mono text-xs">{tx.transaction_number}</td>
-                      <td className="whitespace-nowrap text-xs text-gray-500">
+                      <td className="font-mono text-xs"><span className="code-chip">{tx.transaction_number}</span></td>
+                      <td className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
                         {formatWib(tx.transaction_at)}
                       </td>
                       <td>
                         <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
-                            TYPE_CLASSES[tx.transaction_type] ?? 'bg-gray-100 text-gray-700'
-                          }`}
+                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_CLASSES[tx.transaction_type] ?? 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                            }`}
                         >
                           {TYPE_LABELS[tx.transaction_type] ?? tx.transaction_type}
                           {tx.is_reversed && ' (Dibatalkan)'}
                         </span>
                       </td>
                       <td>
-                        <span className="block font-medium text-gray-900">
+                        <span className="block font-medium text-slate-900 dark:text-slate-100">
                           {tx.items?.name ?? '—'}
                         </span>
-                        <span className="block text-xs text-gray-400">{tx.items?.sku}</span>
+                        <span className="block text-xs text-slate-400 dark:text-slate-500">{tx.items?.sku}</span>
                       </td>
                       <td className="text-right tabular-nums">
                         <span
-                          className={tx.quantity_delta >= 0 ? 'text-green-700' : 'text-red-700'}
+                          className={tx.quantity_delta >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
                         >
                           {tx.quantity_delta >= 0 ? '+' : ''}
                           {tx.quantity_delta.toLocaleString('id-ID')}
                         </span>
-                        <span className="ml-1 text-xs text-gray-400">{tx.units?.symbol}</span>
+                        <span className="ml-1 text-xs text-slate-400 dark:text-slate-500">{tx.units?.symbol}</span>
                       </td>
-                      <td className="text-right tabular-nums text-gray-700">
+                      <td className="text-right tabular-nums text-slate-700 dark:text-slate-200">
                         {tx.stock_after.toLocaleString('id-ID')}
                       </td>
-                      <td className="text-sm text-gray-600">
+                      <td className="text-sm text-slate-600 dark:text-slate-300">
                         {tx.profiles?.full_name ?? tx.profiles?.username ?? '—'}
                       </td>
-                      <td className="max-w-[180px] truncate text-xs text-gray-500" title={tx.reason ?? undefined}>
+                      <td className="max-w-[180px] truncate text-xs text-slate-500 dark:text-slate-400" title={tx.reason ?? undefined}>
                         {tx.reason ?? '—'}
                       </td>
                     </tr>
@@ -420,7 +419,7 @@ export default function ReportsClient({
 
             {/* Pagination */}
             {totalPages > 1 && (
-              <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+              <div className="mt-4 flex items-center justify-between text-sm text-slate-600 dark:text-slate-300">
                 <span>
                   Halaman {page} dari {totalPages}
                 </span>
@@ -429,7 +428,7 @@ export default function ReportsClient({
                     type="button"
                     onClick={() => goToPage(page - 1)}
                     disabled={page <= 1}
-                    className="rounded border border-gray-300 px-3 py-1 hover:bg-gray-50 disabled:opacity-40"
+                    className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700 disabled:opacity-40"
                   >
                     ‹ Sebelumnya
                   </button>
@@ -437,7 +436,7 @@ export default function ReportsClient({
                     type="button"
                     onClick={() => goToPage(page + 1)}
                     disabled={page >= totalPages}
-                    className="rounded border border-gray-300 px-3 py-1 hover:bg-gray-50 disabled:opacity-40"
+                    className="rounded border border-slate-300 px-3 py-1 hover:bg-slate-50 dark:border-slate-600 dark:hover:bg-slate-700 disabled:opacity-40"
                   >
                     Berikutnya ›
                   </button>
@@ -451,15 +450,15 @@ export default function ReportsClient({
       {/* Low stock items */}
       {!lowStockError && (
         <div className="card">
-          <h2 className="mb-3 text-base font-semibold text-gray-900">
+          <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">
             Barang Stok Rendah
-            <span className="ml-2 text-sm font-normal text-gray-500">
+            <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
               (stok ≤ minimum, maks 20 barang)
             </span>
           </h2>
           {lowStockItems.length === 0 ? (
-            <div className="rounded-md border border-dashed border-gray-300 py-8 text-center">
-              <p className="text-sm text-green-600">✓ Semua barang memiliki stok di atas minimum.</p>
+            <div className="rounded-md border border-dashed border-slate-300 py-8 text-center dark:border-slate-700">
+              <p className="text-sm text-green-600 dark:text-green-400">✓ Semua barang memiliki stok di atas minimum.</p>
             </div>
           ) : (
             <div className="table-container">
@@ -477,15 +476,15 @@ export default function ReportsClient({
                 <tbody>
                   {lowStockItems.map((item) => (
                     <tr key={item.id}>
-                      <td className="font-mono text-xs">{item.sku}</td>
-                      <td className="font-medium">{item.name}</td>
-                      <td className="text-right tabular-nums font-bold text-red-700">
+                      <td className="font-mono text-xs text-slate-700 dark:text-slate-300">{item.sku}</td>
+                      <td className="font-medium text-slate-900 dark:text-slate-100">{item.name}</td>
+                      <td className="text-right tabular-nums font-bold text-red-600 dark:text-red-400">
                         {item.current_stock.toLocaleString('id-ID')}
                       </td>
-                      <td className="text-right tabular-nums text-gray-600">
+                      <td className="text-right tabular-nums text-slate-600 dark:text-slate-300">
                         {item.minimum_stock.toLocaleString('id-ID')}
                       </td>
-                      <td className="text-gray-500">
+                      <td className="text-slate-500 dark:text-slate-400">
                         {item.base_unit?.symbol ?? '—'}
                       </td>
                       <td>
@@ -525,7 +524,7 @@ function SummaryCard({
     red: 'bg-red-50 text-red-700 border-red-200',
     blue: 'bg-blue-50 text-blue-700 border-blue-200',
     orange: 'bg-orange-50 text-orange-700 border-orange-200',
-    gray: 'bg-gray-50 text-gray-700 border-gray-200',
+    gray: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-700/60 dark:text-slate-300 dark:border-slate-600',
   }
   return (
     <div className={`rounded-lg border p-4 ${colorClasses[color]}`}>

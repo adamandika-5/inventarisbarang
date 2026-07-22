@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import NewItemForm from './new-item-form'
 
@@ -17,8 +17,8 @@ export default async function NewItemPage() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Tambah Barang</h1>
-        <p className="mt-1 text-sm text-gray-500">Daftarkan barang baru ke sistem inventaris</p>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Tambah Barang</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">Daftarkan barang baru ke sistem inventaris</p>
       </div>
       <NewItemForm categories={categories ?? []} units={units ?? []} />
     </div>

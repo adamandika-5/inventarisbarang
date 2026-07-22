@@ -106,7 +106,7 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
       </div>
 
       {initialUsers.length === 0 ? (
-        <div className="card py-12 text-center text-gray-500">
+        <div className="card py-12 text-center text-slate-500 dark:text-slate-400">
           <p className="text-lg font-medium">Tidak ada pengguna ditemukan</p>
         </div>
       ) : (
@@ -123,15 +123,15 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
                 <th scope="col" className="text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody>
               {initialUsers.map((user) => (
                 <tr key={user.id}>
-                  <td className="font-medium">{user.full_name}</td>
+                  <td className="font-medium text-slate-900 dark:text-slate-100">{user.full_name}</td>
                   <td>
-                    <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs">{user.username}</code>
+                    <code className="code-chip">{user.username}</code>
                   </td>
                   <td>
-                    <span className={user.role === 'ADMIN' ? 'text-blue-700 text-sm font-medium' : 'text-sm text-gray-600'}>
+                    <span className={user.role === 'ADMIN' ? 'text-sm font-medium text-blue-700 dark:text-blue-400' : 'text-sm text-slate-600 dark:text-slate-300'}>
                       {user.role === 'ADMIN' ? 'Admin' : 'Pegawai'}
                     </span>
                   </td>
@@ -146,10 +146,10 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
                     {user.must_change_password ? (
                       <span className="badge-hampir-habis text-xs">Harus ganti</span>
                     ) : (
-                      <span className="text-xs text-gray-400">Normal</span>
+                      <span className="text-xs text-slate-400 dark:text-slate-500">Normal</span>
                     )}
                   </td>
-                  <td className="text-sm text-gray-500">
+                  <td className="text-sm text-slate-500 dark:text-slate-400">
                     {dtf.format(new Date(user.created_at))}
                   </td>
                   <td className="text-right">
@@ -185,7 +185,7 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
 
       {totalPages > 1 && (
         <nav className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-gray-600">Halaman {page} dari {totalPages} ({totalCount} pengguna)</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Halaman {page} dari {totalPages} ({totalCount} pengguna)</p>
           <div className="flex gap-2">
             <button type="button" className="btn-secondary text-sm"
               onClick={() => updateParam('page', String(page - 1))} disabled={page <= 1}>

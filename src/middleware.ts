@@ -65,24 +65,27 @@ export async function middleware(request: NextRequest) {
   if (!user) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('from', pathname)
-    return NextResponse.redirect(loginUrl)
+    const redirectResponse = NextResponse.redirect(loginUrl)
+    redirectResponse.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate')
+    redirectResponse.headers.set('Pragma', 'no-cache')
+    redirectResponse.headers.set('Expires', '0')
+    return redirectResponse
   }
 
+  // Prevent browser caching of protected routes to enforce auth check on Back button
+  supabaseResponse.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate')
+  supabaseResponse.headers.set('Pragma', 'no-cache')
+  supabaseResponse.headers.set('Expires', '0')
+
   // Role-based route protection
-  // Note: Actual role is verified server-side in each page/route handler
-  // This middleware provides UX-level protection only
-  // Server-side checks in pages/API routes provide the security boundary
   if (ADMIN_ROUTES.some((route) => pathname.startsWith(route))) {
-    // Admin routes — additional role check happens in page
     return supabaseResponse
   }
 
   if (EMPLOYEE_ROUTES.some((route) => pathname.startsWith(route))) {
-    // Employee routes — additional role check happens in page
     return supabaseResponse
   }
 
-  // Root redirect to appropriate dashboard (handled in page.tsx)
   return supabaseResponse
 }
 

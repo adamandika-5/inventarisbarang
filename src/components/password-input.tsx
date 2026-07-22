@@ -80,7 +80,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
           onClick={toggleShowPassword}
           aria-label={showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
           aria-pressed={showPassword}
-          className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700 focus:text-gray-700 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+          className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-500 hover:text-slate-700 focus:text-slate-700 focus:outline-none dark:text-slate-400 dark:hover:text-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {showPassword ? <EyeOffIcon /> : <EyeIcon />}
         </button>

@@ -78,7 +78,7 @@ export default function UnitsClient({ initialUnits }: UnitsClientProps) {
       )}
 
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
           {activeCount} aktif &middot; {units.length - activeCount} nonaktif
         </p>
         <button
@@ -94,7 +94,7 @@ export default function UnitsClient({ initialUnits }: UnitsClientProps) {
 
       {showAddForm && (
         <div className="card mb-4">
-          <h2 className="mb-3 text-base font-semibold text-gray-900">Tambah Satuan</h2>
+          <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">Tambah Satuan</h2>
           <form action={handleAdd} className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-36">
               <label htmlFor="add-unit-name" className="label mb-1">
@@ -133,7 +133,7 @@ export default function UnitsClient({ initialUnits }: UnitsClientProps) {
       )}
 
       {units.length === 0 ? (
-        <div className="card py-12 text-center text-gray-500">
+        <div className="card py-12 text-center text-slate-500 dark:text-slate-400">
           <p className="text-lg font-medium">Belum ada satuan</p>
           <p className="mt-1 text-sm">Klik &ldquo;Tambah Satuan&rdquo; untuk memulai.</p>
         </div>
@@ -148,7 +148,7 @@ export default function UnitsClient({ initialUnits }: UnitsClientProps) {
                 <th scope="col" className="text-right">Aksi</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody>
               {units.map((unit) => (
                 <tr key={unit.id}>
                   <td>
@@ -189,12 +189,12 @@ export default function UnitsClient({ initialUnits }: UnitsClientProps) {
                         </button>
                       </form>
                     ) : (
-                      <span className="font-medium text-gray-900">{unit.name}</span>
+                      <span className="font-medium text-slate-900 dark:text-slate-100">{unit.name}</span>
                     )}
                   </td>
                   <td>
                     {editingId === unit.id ? null : (
-                      <code className="rounded bg-gray-100 px-1.5 py-0.5 text-sm font-mono text-gray-700">
+                      <code className="code-chip">
                         {unit.symbol}
                       </code>
                     )}

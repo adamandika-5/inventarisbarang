@@ -85,7 +85,7 @@ export default function AuditLogClient({ logs, totalCount, page, pageSize, actio
       </div>
 
       {logs.length === 0 ? (
-        <div className="card py-12 text-center text-gray-500">
+        <div className="card py-12 text-center text-slate-500 dark:text-slate-400">
           <p>Tidak ada log ditemukan.</p>
         </div>
       ) : (
@@ -100,25 +100,25 @@ export default function AuditLogClient({ logs, totalCount, page, pageSize, actio
                 <th scope="col">Alasan</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody>
               {logs.map((log) => (
                 <tr key={log.id}>
-                  <td className="text-sm text-gray-500 whitespace-nowrap">
+                  <td className="whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                     {dtf.format(new Date(log.performed_at))}
                   </td>
                   <td>
-                    <span className="text-sm font-medium">{ACTION_LABELS[log.action] ?? log.action}</span>
+                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{ACTION_LABELS[log.action] ?? log.action}</span>
                   </td>
-                  <td className="text-sm text-gray-600">
+                  <td className="text-sm text-slate-600 dark:text-slate-300">
                     {log.entity_type}
                     {log.entity_id && (
-                      <div className="text-xs text-gray-400 font-mono">{log.entity_id.slice(0, 8)}…</div>
+                      <div className="font-mono text-xs text-slate-400 dark:text-slate-500">{log.entity_id.slice(0, 8)}…</div>
                     )}
                   </td>
-                  <td className="text-sm">
+                  <td className="text-sm text-slate-900 dark:text-slate-100">
                     {log.profiles?.full_name ?? log.profiles?.username ?? 'Sistem'}
                   </td>
-                  <td className="text-sm text-gray-500">{log.reason ?? '—'}</td>
+                  <td className="text-sm text-slate-500 dark:text-slate-400">{log.reason ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
@@ -128,7 +128,7 @@ export default function AuditLogClient({ logs, totalCount, page, pageSize, actio
 
       {totalPages > 1 && (
         <nav className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-gray-600">Halaman {page} dari {totalPages} ({totalCount} entri)</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Halaman {page} dari {totalPages} ({totalCount} entri)</p>
           <div className="flex gap-2">
             <button type="button" className="btn-secondary text-sm"
               onClick={() => updateParam('page', String(page - 1))} disabled={page <= 1}>

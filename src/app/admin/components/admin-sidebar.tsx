@@ -1,13 +1,14 @@
 'use client'
 
 /**
- * AdminSidebar — Desktop navigation sidebar.
+ * AdminSidebar — Desktop navigation sidebar with dark mode support.
  * SECURITY: Navigation only, actual auth is server-side per page/route.
  */
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
+import ThemeToggle from '@/components/theme-toggle'
 
 interface AdminSidebarProps {
   fullName: string
@@ -137,11 +138,12 @@ const navItems = [
 
 export default function AdminSidebar({ fullName }: AdminSidebarProps) {
   const pathname = usePathname()
+  const router = useRouter()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const isActive = (href: string, exact?: boolean) => {
     if (exact) return pathname === href
-    // For categories section, include units route
     if (href === '/admin/categories') {
       return pathname.startsWith('/admin/categories') || pathname.startsWith('/admin/units')
     }
@@ -149,68 +151,90 @@ export default function AdminSidebar({ fullName }: AdminSidebarProps) {
   }
 
   const handleLogout = async () => {
+    if (isLoggingOut) return
     setIsLoggingOut(true)
+    setErrorMsg(null)
+
     try {
-      await fetch('/api/auth/logout', { method: 'POST' })
-      window.location.href = '/login'
-    } catch {
-      window.location.href = '/login'
+      const res = await fetch('/api/auth/logout', { method: 'POST' })
+      if (!res.ok) {
+        throw new Error('Gagal keluar dari akun. Silakan coba lagi.')
+      }
+      const data = (await res.json()) as { success?: boolean; error?: string }
+      if (!data.success) {
+        throw new Error(data.error || 'Gagal keluar dari akun. Silakan coba lagi.')
+      }
+      router.replace('/login')
+      router.refresh()
+    } catch (err: unknown) {
+      setIsLoggingOut(false)
+      const msg = err instanceof Error ? err.message : 'Gagal keluar dari akun.'
+      setErrorMsg(msg)
     }
   }
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col bg-white shadow-md lg:flex">
+    <aside className="fixed inset-y-0 left-0 z-40 hidden w-64 flex-col lg:flex bg-white dark:bg-slate-800 border-r border-slate-200 dark:border-slate-700 shadow-sm transition-colors">
       {/* Brand */}
-      <div className="flex h-16 items-center border-b border-gray-200 px-6">
+      <div className="flex h-16 items-center px-6 border-b border-slate-200 dark:border-slate-700">
         <div className="flex items-center gap-2">
           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-600 text-white">
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
           </div>
-          <span className="text-lg font-bold text-gray-900">InventarisBarang</span>
+          <span className="text-lg font-bold text-slate-900 dark:text-white">InventarisBarang</span>
         </div>
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4" aria-label="Menu admin">
-        <ul className="space-y-1">
-          {navItems.map((item) => (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                  isActive(item.href, item.exact)
-                    ? 'bg-blue-50 text-blue-700'
-                    : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                }`}
-                aria-current={isActive(item.href, item.exact) ? 'page' : undefined}
-              >
-                <span className={isActive(item.href, item.exact) ? 'text-blue-600' : 'text-gray-400'}>
-                  {item.icon}
-                </span>
-                {item.label}
-              </Link>
-            </li>
-          ))}
+        <ul className="space-y-0.5">
+          {navItems.map((item) => {
+            const active = isActive(item.href, item.exact)
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${active
+                      ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold'
+                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  aria-current={active ? 'page' : undefined}
+                >
+                  <span className={active ? 'text-blue-600 dark:text-blue-400' : 'text-slate-400 dark:text-slate-400'}>
+                    {item.icon}
+                  </span>
+                  {item.label}
+                </Link>
+              </li>
+            )
+          })}
         </ul>
       </nav>
 
       {/* User footer */}
-      <div className="border-t border-gray-200 p-4">
+      <div className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
         <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 dark:bg-blue-900/40 text-sm font-bold text-blue-700 dark:text-blue-300">
             {fullName.charAt(0).toUpperCase()}
           </div>
           <div className="flex-1 overflow-hidden">
-            <p className="truncate text-sm font-medium text-gray-900">{fullName}</p>
-            <p className="text-xs text-gray-500">Admin</p>
+            <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{fullName}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Admin</p>
           </div>
+          {/* Theme toggle */}
+          <ThemeToggle
+            className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+          />
         </div>
+        {errorMsg && (
+          <p className="mt-2 text-xs text-red-600 dark:text-red-400 font-medium">{errorMsg}</p>
+        )}
         <div className="mt-3 flex gap-2">
           <Link
             href="/admin/account"
-            className="flex-1 rounded-md px-2 py-1.5 text-center text-xs font-medium text-gray-600 hover:bg-gray-100"
+            className="flex-1 rounded-md px-2 py-1.5 text-center text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors hover:bg-slate-100 dark:hover:bg-slate-700"
           >
             Akun
           </Link>
@@ -218,7 +242,7 @@ export default function AdminSidebar({ fullName }: AdminSidebarProps) {
             type="button"
             onClick={handleLogout}
             disabled={isLoggingOut}
-            className="flex-1 rounded-md px-2 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+            className="flex-1 rounded-md px-2 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
           >
             {isLoggingOut ? 'Keluar…' : 'Keluar'}
           </button>

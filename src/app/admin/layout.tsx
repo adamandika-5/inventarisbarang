@@ -40,7 +40,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-50">
+    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors">
       {/* Desktop sidebar */}
       <AdminSidebar fullName={profile.full_name ?? profile.username ?? 'Admin'} />
 

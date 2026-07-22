@@ -167,12 +167,12 @@ export default function ImportClient() {
             htmlFor="import-file-input"
             className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed py-10 transition-colors ${
               selectedFile
-                ? 'border-green-400 bg-green-50'
-                : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
+                ? 'border-green-400 bg-green-50 dark:border-green-700 dark:bg-green-950/30'
+                : 'border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-800/50 dark:hover:border-blue-500 dark:hover:bg-blue-950/30'
             }`}
           >
             <svg
-              className={`mb-3 h-10 w-10 ${selectedFile ? 'text-green-500' : 'text-gray-400'}`}
+              className={`mb-3 h-10 w-10 ${selectedFile ? 'text-green-500' : 'text-slate-400 dark:text-slate-500'}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -194,8 +194,8 @@ export default function ImportClient() {
               </div>
             ) : (
               <div className="text-center">
-                <p className="font-medium text-gray-700">Klik untuk memilih file</p>
-                <p className="mt-1 text-xs text-gray-500">atau seret dan lepas di sini</p>
+                <p className="font-medium text-slate-700 dark:text-slate-300">Klik untuk memilih file</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">atau seret dan lepas di sini</p>
               </div>
             )}
             <input
@@ -237,10 +237,10 @@ export default function ImportClient() {
           <div className="card">
             <div className="mb-3 flex items-center justify-between">
               <div>
-                <h2 className="text-base font-semibold text-gray-900">
+                <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
                   Preview Data ({previewRows.length} baris)
                 </h2>
-                <p className="mt-1 text-sm text-gray-500">
+                <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
                   File: <span className="font-medium">{selectedFile?.name}</span>. Periksa data
                   sebelum mengkonfirmasi impor.
                 </p>
@@ -269,16 +269,16 @@ export default function ImportClient() {
                 <tbody>
                   {previewRows.map((row) => (
                     <tr key={row.rowIndex}>
-                      <td className="font-mono text-xs text-gray-500">{row.rowIndex}</td>
-                      <td className="font-medium">{row.name || <EmptyCell />}</td>
-                      <td>{row.category_name || <EmptyCell />}</td>
-                      <td>{row.unit_name || <EmptyCell />}</td>
-                      <td className="font-mono text-xs">{row.barcode || <EmptyCell />}</td>
-                      <td className="text-xs">{row.barcode_format}</td>
-                      <td className="text-right">{row.minimum_stock}</td>
-                      <td className="text-right">{row.initial_stock}</td>
-                      <td>{row.is_active ? 'Ya' : 'Tidak'}</td>
-                      <td className="font-mono text-xs text-gray-400">{row.sku || '(auto)'}</td>
+                      <td className="font-mono text-xs text-slate-500 dark:text-slate-400">{row.rowIndex}</td>
+                      <td className="font-medium text-slate-900 dark:text-slate-100">{row.name || <EmptyCell />}</td>
+                      <td className="text-slate-700 dark:text-slate-300">{row.category_name || <EmptyCell />}</td>
+                      <td className="text-slate-700 dark:text-slate-300">{row.unit_name || <EmptyCell />}</td>
+                      <td className="font-mono text-xs text-slate-700 dark:text-slate-300">{row.barcode || <EmptyCell />}</td>
+                      <td className="text-xs text-slate-700 dark:text-slate-300">{row.barcode_format}</td>
+                      <td className="text-right text-slate-700 dark:text-slate-300">{row.minimum_stock}</td>
+                      <td className="text-right text-slate-700 dark:text-slate-300">{row.initial_stock}</td>
+                      <td className="text-slate-700 dark:text-slate-300">{row.is_active ? 'Ya' : 'Tidak'}</td>
+                      <td className="font-mono text-xs text-slate-400 dark:text-slate-500">{row.sku || '(auto)'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -310,22 +310,22 @@ export default function ImportClient() {
         <div className="space-y-4">
           {/* Summary card */}
           <div className={`card border-l-4 ${importResult.success ? 'border-l-green-500' : 'border-l-red-500'}`}>
-            <h2 className="mb-3 text-base font-semibold text-gray-900">Hasil Impor</h2>
+                <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">Hasil Impor</h2>
             {importResult.error && !importResult.rows.length && (
               <div className="alert-error mb-3">{importResult.error}</div>
             )}
             <div className="grid grid-cols-3 gap-4 text-center">
-              <div className="rounded-md bg-green-50 p-3">
-                <p className="text-2xl font-bold text-green-700">{importResult.successCount}</p>
-                <p className="text-xs text-green-600">Berhasil</p>
+              <div className="rounded-md bg-green-50 p-3 dark:bg-green-950/30">
+                <p className="text-2xl font-bold text-green-700 dark:text-green-400">{importResult.successCount}</p>
+                <p className="text-xs text-green-600 dark:text-green-400">Berhasil</p>
               </div>
-              <div className="rounded-md bg-red-50 p-3">
-                <p className="text-2xl font-bold text-red-700">{importResult.failCount}</p>
-                <p className="text-xs text-red-600">Gagal</p>
+              <div className="rounded-md bg-red-50 p-3 dark:bg-red-950/30">
+                <p className="text-2xl font-bold text-red-700 dark:text-red-400">{importResult.failCount}</p>
+                <p className="text-xs text-red-600 dark:text-red-400">Gagal</p>
               </div>
-              <div className="rounded-md bg-gray-50 p-3">
-                <p className="text-2xl font-bold text-gray-700">{importResult.total}</p>
-                <p className="text-xs text-gray-600">Total Baris</p>
+              <div className="rounded-md bg-slate-50 p-3 dark:bg-slate-700/60">
+                <p className="text-2xl font-bold text-slate-700 dark:text-slate-200">{importResult.total}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-300">Total Baris</p>
               </div>
             </div>
           </div>
@@ -333,7 +333,7 @@ export default function ImportClient() {
           {/* Row detail */}
           {importResult.rows.length > 0 && (
             <div className="card">
-              <h3 className="mb-3 text-sm font-semibold text-gray-900">Detail Per Baris</h3>
+              <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Detail Per Baris</h3>
               <div className="table-container">
                 <table className="table">
                   <thead>
@@ -375,7 +375,7 @@ export default function ImportClient() {
 }
 
 function EmptyCell() {
-  return <span className="text-xs text-gray-300 italic">kosong</span>
+  return <span className="italic text-xs text-slate-300 dark:text-slate-600">kosong</span>
 }
 
 function StatusBadge({ status }: { status: ImportRowResult['status'] }) {

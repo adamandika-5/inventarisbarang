@@ -2,32 +2,229 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─── Theme Variables ───────────────────────────────────────────────────────── */
 @layer base {
   :root {
     --font-inter: 'Inter', system-ui, sans-serif;
+
+    /* Surfaces */
+    --bg-page: #f9fafb;
+    /* gray-50  */
+    --bg-card: #ffffff;
+    --bg-sidebar: #ffffff;
+    --bg-nav: #ffffff;
+    --bg-input: #ffffff;
+    --bg-table-head: #f9fafb;
+    /* gray-50  */
+    --bg-table-row: #ffffff;
+    /* baris default */
+    --bg-table-row-alt: #f9fafb;
+    /* zebra row genap */
+    --bg-table-row-hover: #f1f5f9;
+    /* slate-100 — hover */
+    --bg-muted: #f3f4f6;
+    /* gray-100 */
+    --bg-code: #f3f4f6;
+    /* chip SKU */
+    --text-code: #1e40af;
+    /* blue-800 — teks chip SKU */
+
+    /* Text */
+    --text-primary: #111827;
+    /* gray-900 */
+    --text-secondary: #374151;
+    /* gray-700 */
+    --text-muted: #6b7280;
+    /* gray-500 */
+    --text-faint: #9ca3af;
+    /* gray-400 */
+    --text-label: #374151;
+
+    /* Borders */
+    --border-default: #e5e7eb;
+    /* gray-200 */
+    --border-muted: #f3f4f6;
+    /* gray-100 */
+    --border-input: #d1d5db;
+    /* gray-300 */
+
+    /* Brand */
+    --brand-600: #2563eb;
+    --brand-700: #1d4ed8;
+    --brand-50: #eff6ff;
+    --brand-100: #dbeafe;
+
+    /* Status */
+    --success-bg: #f0fdf4;
+    --success-border: #bbf7d0;
+    --success-text: #15803d;
+    --error-bg: #fef2f2;
+    --error-border: #fecaca;
+    --error-text: #dc2626;
+    --warning-bg: #fffbeb;
+    --warning-border: #fde68a;
+    --warning-text: #d97706;
+    --info-bg: #eff6ff;
+    --info-border: #bfdbfe;
+    --info-text: #2563eb;
+
+    /* Shadow */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+
+    /* Scrollbar — light */
+    --scrollbar-track: #f1f5f9;
+    --scrollbar-thumb: #94a3b8;
+    --scrollbar-thumb-hover: #64748b;
+
+    color-scheme: light;
+  }
+
+  /* ── Dark Mode ─────────────────────────────────────────────────────────────── */
+  .dark {
+    --bg-page: #0f172a;
+    /* slate-900 */
+    --bg-card: #1e293b;
+    /* slate-800 */
+    --bg-sidebar: #1e293b;
+    --bg-nav: #1e293b;
+    --bg-input: #1e293b;
+    --bg-table-head: #0f172a;
+    /* slate-900 — header lebih gelap */
+    --bg-table-row: #1e293b;
+    /* slate-800 — baris ganjil */
+    --bg-table-row-alt: #172033;
+    /* slate-850 — baris genap lebih gelap sedikit */
+    --bg-table-row-hover: #293548;
+    /* slate-750 — hover jelas tapi tidak menyilaukan */
+    --bg-muted: #334155;
+    /* slate-700 */
+    --bg-code: #0f172a;
+    /* slate-900 — chip SKU/kode */
+
+    --text-primary: #f1f5f9;
+    /* slate-100 */
+    --text-secondary: #cbd5e1;
+    /* slate-300 */
+    --text-muted: #94a3b8;
+    /* slate-400 */
+    --text-faint: #64748b;
+    /* slate-500 */
+    --text-label: #cbd5e1;
+    --text-code: #7dd3fc;
+    /* sky-300 — teks chip SKU */
+
+    --border-default: #334155;
+    /* slate-700 */
+    --border-muted: #253041;
+    /* sedikit lebih terang dari row agar divider terlihat */
+    --border-input: #475569;
+    /* slate-600 */
+
+    --brand-50: #172554;
+    --brand-100: #1e3a8a;
+
+    --success-bg: #052e16;
+    --success-border: #166534;
+    --success-text: #4ade80;
+    --error-bg: #450a0a;
+    --error-border: #991b1b;
+    --error-text: #f87171;
+    --warning-bg: #422006;
+    --warning-border: #92400e;
+    --warning-text: #fbbf24;
+    --info-bg: #172554;
+    --info-border: #1e3a8a;
+    --info-text: #60a5fa;
+
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+
+    /* Scrollbar — dark */
+    --scrollbar-track: #0f172a;
+    --scrollbar-thumb: #475569;
+    --scrollbar-thumb-hover: #64748b;
+
+    color-scheme: dark;
   }
 
   * {
     box-sizing: border-box;
   }
 
-  body {
-    @apply bg-gray-50 text-gray-800;
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+  html {
+    /* Scrollbar global — html/body */
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    scrollbar-width: thin;
   }
 
-  /* Ensure consistent focus visible styles for accessibility */
+  body {
+    background-color: var(--bg-page);
+    color: var(--text-primary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    transition: background-color 0.2s ease, color 0.2s ease;
+  }
+
+  /* ── Webkit scrollbar — html/body & overflow containers ── */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border-radius: 3px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+
+  /* ── Headings always follow --text-primary ── */
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary);
+  }
+
+  /* ── Paragraphs follow --text-secondary by default ── */
+  p {
+    color: var(--text-secondary);
+  }
+
+  /* ── Native select follows color-scheme ── */
+  select {
+    background-color: var(--bg-input);
+    color: var(--text-primary);
+    border-color: var(--border-input);
+  }
+
+  /* ── Prevent bg-white leaks inside dark mode ── */
+  .dark .divide-gray-100 {
+    --tw-divide-opacity: 1;
+    border-color: var(--border-muted);
+  }
+
+  .dark .divide-gray-200 {
+    border-color: var(--border-default);
+  }
+
+  /* Consistent focus for accessibility */
   :focus-visible {
     @apply outline-2 outline-offset-2 outline-primary-600;
   }
 }
 
+/* ─── Components ──────────────────────────────────────────────────────────────── */
 @layer components {
-  /* Reusable button base */
+
+  /* ── Buttons ───────────────────────────────────────────────────────────────── */
   .btn {
     @apply inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
-    min-height: 2.75rem; /* 44px touch target */
+    min-height: 2.75rem;
     padding: 0.625rem 1rem;
   }
 
@@ -36,7 +233,10 @@
   }
 
   .btn-secondary {
-    @apply btn border border-gray-300 bg-white text-gray-700 hover:bg-gray-50 active:bg-gray-100;
+    border: 1px solid var(--border-input);
+    background-color: var(--bg-card);
+    color: var(--text-secondary);
+    @apply btn hover:opacity-80 active:opacity-70;
   }
 
   .btn-danger {
@@ -44,86 +244,202 @@
   }
 
   .btn-ghost {
-    @apply btn text-gray-700 hover:bg-gray-100 active:bg-gray-200;
+    color: var(--text-secondary);
+    @apply btn hover:bg-gray-100 dark:hover:bg-slate-700 active:bg-gray-200 dark:active:bg-slate-600;
   }
 
-  /* Form elements */
+  /* ── Form Elements ─────────────────────────────────────────────────────────── */
   .input {
-    @apply block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-400 shadow-sm transition-colors focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:bg-gray-50 disabled:text-gray-500;
+    background-color: var(--bg-input);
+    color: var(--text-primary);
+    border-color: var(--border-input);
+    @apply block w-full rounded-md border px-3 py-2 text-sm shadow-sm transition-colors placeholder-gray-400 dark:placeholder-slate-500 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500 disabled:opacity-50;
     min-height: 2.5rem;
   }
 
   .label {
-    @apply block text-sm font-medium text-gray-700;
+    color: var(--text-label);
+    @apply block text-sm font-medium;
   }
 
-  /* Status badge */
+  /* ── Badges ──────────────────────────────────────────────────────────────── */
   .badge-aman {
-    @apply inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800;
+    @apply inline-flex items-center gap-1 rounded-full bg-green-100 dark:bg-green-900/40 px-2.5 py-0.5 text-xs font-medium text-green-800 dark:text-green-300;
   }
 
   .badge-hampir-habis {
-    @apply inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-medium text-yellow-800;
+    @apply inline-flex items-center gap-1 rounded-full bg-yellow-100 dark:bg-yellow-900/40 px-2.5 py-0.5 text-xs font-medium text-yellow-800 dark:text-yellow-300;
   }
 
   .badge-habis {
-    @apply inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-800;
+    @apply inline-flex items-center gap-1 rounded-full bg-red-100 dark:bg-red-900/40 px-2.5 py-0.5 text-xs font-medium text-red-800 dark:text-red-300;
   }
 
   .badge-nonaktif {
-    @apply inline-flex items-center gap-1 rounded-full bg-gray-100 px-2.5 py-0.5 text-xs font-medium text-gray-600;
+    @apply inline-flex items-center gap-1 rounded-full bg-gray-100 dark:bg-slate-700 px-2.5 py-0.5 text-xs font-medium text-gray-600 dark:text-slate-300;
   }
 
-  /* Card */
+  /* ── Card ──────────────────────────────────────────────────────────────────── */
   .card {
-    @apply rounded-lg border border-gray-200 bg-white p-4 shadow-sm;
+    background-color: var(--bg-card);
+    border-color: var(--border-default);
+    box-shadow: var(--shadow-sm);
+    @apply rounded-lg border p-4;
   }
 
-  /* Table */
+  /* ── Table ─────────────────────────────────────────────────────────────────── */
   .table-container {
-    @apply overflow-x-auto rounded-lg border border-gray-200;
+    border-color: var(--border-default);
+    @apply overflow-x-auto rounded-lg border;
   }
 
   .table {
-    @apply w-full divide-y divide-gray-200 text-sm;
+    @apply w-full divide-y text-sm;
+    divide-color: var(--border-default);
   }
 
   .table thead {
-    @apply bg-gray-50;
+    background-color: var(--bg-table-head);
   }
 
   .table th {
-    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600;
+    color: var(--text-muted);
+    @apply px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider;
   }
 
   .table td {
-    @apply px-4 py-3 text-gray-800;
+    color: var(--text-secondary);
+    @apply px-4 py-3;
   }
 
+  /* Setiap baris tbody punya background default — mencegah "bocor putih" */
   .table tbody tr {
-    @apply border-b border-gray-100 transition-colors hover:bg-gray-50;
+    background-color: var(--bg-table-row);
+    border-bottom: 1px solid var(--border-muted);
+    transition: background-color 0.15s ease;
   }
 
-  /* Alert/notification states */
+  /* Zebra halus — baris genap sedikit lebih berbeda */
+  .table tbody tr:nth-child(even) {
+    background-color: var(--bg-table-row-alt);
+  }
+
+  /* Hover selalu pakai --bg-table-row-hover, override zebra */
+  .table tbody tr:hover {
+    background-color: var(--bg-table-row-hover) !important;
+  }
+
+  /* Chip SKU / kode inline */
+  .code-chip {
+    background-color: var(--bg-code);
+    color: var(--text-code);
+    @apply rounded px-1.5 py-0.5 text-xs font-mono font-medium;
+  }
+
+  /* ── Alerts ─────────────────────────────────────────────────────────────────── */
   .alert-error {
-    @apply rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700;
+    background-color: var(--error-bg);
+    border-color: var(--error-border);
+    color: var(--error-text);
+    @apply rounded-md border p-3 text-sm;
   }
 
   .alert-success {
-    @apply rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-700;
+    background-color: var(--success-bg);
+    border-color: var(--success-border);
+    color: var(--success-text);
+    @apply rounded-md border p-3 text-sm;
   }
 
   .alert-warning {
-    @apply rounded-md border border-yellow-200 bg-yellow-50 p-3 text-sm text-yellow-700;
+    background-color: var(--warning-bg);
+    border-color: var(--warning-border);
+    color: var(--warning-text);
+    @apply rounded-md border p-3 text-sm;
   }
 
   .alert-info {
-    @apply rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700;
+    background-color: var(--info-bg);
+    border-color: var(--info-border);
+    color: var(--info-text);
+    @apply rounded-md border p-3 text-sm;
+  }
+
+  /* ── Section divider ─────────────────────────────────────────────────────── */
+  hr.divider {
+    border-color: var(--border-default);
+    @apply border-t;
+  }
+
+  /* ── Tab switcher (Kategori/Satuan style) ─────────────────────────────────── */
+  .tab-nav {
+    background-color: var(--bg-muted);
+    @apply flex gap-1 rounded-lg p-1;
+  }
+
+  .tab-nav-item {
+    color: var(--text-muted);
+    @apply flex-1 rounded-md px-4 py-2 text-center text-sm font-medium transition-colors;
+  }
+
+  .tab-nav-item:hover {
+    background-color: var(--bg-card);
+    color: var(--text-primary);
+  }
+
+  .tab-nav-item[aria-current="page"],
+  .tab-nav-item.active {
+    background-color: var(--bg-card);
+    color: #2563eb;
+    box-shadow: var(--shadow-sm);
+  }
+
+  /* ── Overflow containers with dark scrollbar ──────────────────────────────── */
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-auto {
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+    scrollbar-width: thin;
+  }
+
+  .overflow-y-auto::-webkit-scrollbar,
+  .overflow-x-auto::-webkit-scrollbar,
+  .overflow-auto::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .overflow-y-auto::-webkit-scrollbar-track,
+  .overflow-x-auto::-webkit-scrollbar-track,
+  .overflow-auto::-webkit-scrollbar-track {
+    background: var(--scrollbar-track);
+  }
+
+  .overflow-y-auto::-webkit-scrollbar-thumb,
+  .overflow-x-auto::-webkit-scrollbar-thumb,
+  .overflow-auto::-webkit-scrollbar-thumb {
+    background-color: var(--scrollbar-thumb);
+    border-radius: 3px;
+  }
+
+  .overflow-y-auto::-webkit-scrollbar-thumb:hover,
+  .overflow-x-auto::-webkit-scrollbar-thumb:hover,
+  .overflow-auto::-webkit-scrollbar-thumb:hover {
+    background-color: var(--scrollbar-thumb-hover);
+  }
+
+  /* ── Print surface — always stays white ────────────────────────────────────── */
+  /* Wrap barcode labels or any "paper preview" in this class */
+  .print-surface,
+  .print-surface * {
+    background-color: #ffffff !important;
+    color: #111827 !important;
+    border-color: #d1d5db !important;
   }
 }
 
+/* ─── Utilities ───────────────────────────────────────────────────────────────── */
 @layer utilities {
-  /* Screen reader only but accessible */
   .sr-only {
     position: absolute;
     width: 1px;
@@ -136,9 +452,88 @@
     border-width: 0;
   }
 
-  /* Touch-friendly minimum size */
   .touch-target {
     min-height: 44px;
     min-width: 44px;
+  }
+
+  /* Tabular numbers utility */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ─── Print & Export Styles ──────────────────────────────────────────────────── */
+/* Reports always print as white/light theme regardless of active theme */
+@media print {
+
+  :root,
+  .dark {
+    --bg-page: #ffffff !important;
+    --bg-card: #ffffff !important;
+    --bg-sidebar: #ffffff !important;
+    --bg-nav: #ffffff !important;
+    --bg-input: #ffffff !important;
+    --bg-table-head: #f3f4f6 !important;
+    --bg-table-row: #ffffff !important;
+    --bg-table-row-alt: #f9fafb !important;
+    --bg-table-row-hover: #f9fafb !important;
+    --bg-muted: #f3f4f6 !important;
+    --text-primary: #111827 !important;
+    --text-secondary: #374151 !important;
+    --text-muted: #6b7280 !important;
+    --text-faint: #9ca3af !important;
+    --text-label: #374151 !important;
+    --border-default: #e5e7eb !important;
+    --border-muted: #f3f4f6 !important;
+    --border-input: #d1d5db !important;
+    --brand-50: #eff6ff !important;
+    --brand-100: #dbeafe !important;
+    --success-text: #15803d !important;
+    --error-text: #dc2626 !important;
+    --warning-text: #d97706 !important;
+    --info-text: #2563eb !important;
+  }
+
+  body {
+    background: white !important;
+    color: #111827 !important;
+    font-size: 10pt;
+  }
+
+  /* Hide interactive UI elements */
+  nav,
+  header,
+  aside,
+  .no-print,
+  .btn-primary:not(.print-btn),
+  [class*="btn-secondary"],
+  [class*="btn-ghost"] {
+    display: none !important;
+  }
+
+  /* Report paper layout */
+  .report-paper {
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+
+  /* Repeat table header on each page */
+  thead {
+    display: table-header-group;
+  }
+
+  /* Avoid row breaks */
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* Landscape A4 */
+  @page {
+    size: A4 landscape;
+    margin: 12mm 10mm 12mm 10mm;
   }
 }

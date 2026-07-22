@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import ChangePasswordForm from './change-password-form'
+import ThemeToggle from '@/components/theme-toggle'
 
 export const metadata: Metadata = {
   title: 'Ganti Kata Sandi — InventarisBarang',
@@ -35,10 +36,13 @@ export default async function ChangePasswordPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-gray-50 px-4 py-12">
+    <main className="relative flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-900 px-4 py-12 text-slate-900 dark:text-slate-100 transition-colors">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle className="text-slate-600 dark:text-slate-300" />
+      </div>
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-600">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 shadow-lg">
             <svg
               className="h-9 w-9 text-white"
               viewBox="0 0 24 24"
@@ -53,14 +57,14 @@ export default async function ChangePasswordPage() {
               <path d="M7 11V7a5 5 0 0 1 10 0v4" />
             </svg>
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">InventarisBarang</h1>
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">InventarisBarang</h1>
         </div>
 
-        <div className="card">
-          <h2 className="mb-2 text-center text-lg font-semibold text-gray-800">
+        <div className="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-md">
+          <h2 className="mb-2 text-center text-lg font-semibold text-slate-800 dark:text-slate-200">
             Ganti Kata Sandi
           </h2>
-          <p className="mb-6 text-center text-sm text-gray-500">
+          <p className="mb-6 text-center text-sm text-slate-500 dark:text-slate-400">
             Anda harus mengganti kata sandi sebelum melanjutkan.
           </p>
           <ChangePasswordForm />

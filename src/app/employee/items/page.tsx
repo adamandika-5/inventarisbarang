@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import EmployeeItemsClient from './items-client'
 
@@ -43,8 +43,8 @@ export default async function EmployeeItemsPage({ searchParams }: PageProps) {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Cek Stok Barang</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Cek Stok Barang</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Cari barang dan periksa ketersediaan stok secara real-time.
         </p>
       </div>

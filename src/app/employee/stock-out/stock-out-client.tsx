@@ -133,8 +133,10 @@ export default function StockOutClient() {
       {message && (
         <div
           role="alert"
-          className={`p-4 rounded-lg text-sm font-medium ${
-            message.type === 'success' ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'
+          className={`rounded-lg p-4 text-sm font-medium ${
+            message.type === 'success'
+              ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+              : 'bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-300'
           }`}
         >
           {message.text}
@@ -148,8 +150,8 @@ export default function StockOutClient() {
         </label>
         <ItemSearchInput onSelect={(item) => handleSelectItem(item ? (item as unknown as SelectedItem) : null)} />
         {selectedItem && (
-          <div className="mt-2 rounded-lg bg-gray-50 p-3 text-xs text-gray-700">
-            <p className="font-semibold text-gray-900">{selectedItem.name}</p>
+          <div className="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-700/60 dark:text-slate-300">
+            <p className="font-semibold text-slate-900 dark:text-slate-100">{selectedItem.name}</p>
             <p>SKU: {selectedItem.sku} · Stok saat ini: {Number(selectedItem.current_stock).toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
           </div>
         )}

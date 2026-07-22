@@ -60,7 +60,7 @@ export default function NewItemForm({ categories, units }: NewItemFormProps) {
       <div className="card space-y-6">
         {/* Basic info */}
         <fieldset>
-          <legend className="mb-4 text-base font-semibold text-gray-900">Informasi Dasar</legend>
+          <legend className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">Informasi Dasar</legend>
           <div className="space-y-4">
             <div>
               <label htmlFor="item-name" className="label mb-1">
@@ -120,7 +120,7 @@ export default function NewItemForm({ categories, units }: NewItemFormProps) {
                   </option>
                 ))}
               </select>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 Satuan dasar tidak dapat diubah setelah barang memiliki transaksi.
               </p>
             </div>
@@ -138,7 +138,7 @@ export default function NewItemForm({ categories, units }: NewItemFormProps) {
                 defaultValue={0}
                 className="input"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 Stok di bawah atau sama dengan nilai ini berstatus &ldquo;Hampir Habis&rdquo;.
               </p>
             </div>
@@ -147,12 +147,12 @@ export default function NewItemForm({ categories, units }: NewItemFormProps) {
 
         {/* SKU */}
         <fieldset>
-          <legend className="mb-4 text-base font-semibold text-gray-900">SKU</legend>
+          <legend className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">SKU</legend>
           <div className="flex items-start gap-3">
             <input
               type="checkbox"
               id="custom-sku-toggle"
-              className="mt-1"
+              className="mt-1 accent-blue-600"
               checked={customSku}
               onChange={(e) => setCustomSku(e.target.checked)}
             />
@@ -174,7 +174,7 @@ export default function NewItemForm({ categories, units }: NewItemFormProps) {
                 maxLength={20}
                 className="input max-w-xs font-mono"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 Format: ATK- diikuti minimal 4 digit. Contoh: ATK-0001
               </p>
             </div>
@@ -184,7 +184,7 @@ export default function NewItemForm({ categories, units }: NewItemFormProps) {
 
         {/* Barcode */}
         <fieldset>
-          <legend className="mb-4 text-base font-semibold text-gray-900">Barcode</legend>
+          <legend className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">Barcode</legend>
           <div className="space-y-4">
             <div>
               <label htmlFor="item-barcode-format" className="label mb-1">
@@ -219,7 +219,7 @@ export default function NewItemForm({ categories, units }: NewItemFormProps) {
                 placeholder={barcodeFormat === 'EAN13' ? '1234567890123' : 'Nilai barcode'}
                 className="input font-mono"
               />
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                 {barcodeFormat === 'EAN13' && 'Harus 13 digit angka dengan checksum yang valid.'}
                 {barcodeFormat === 'EAN8' && 'Harus 8 digit angka dengan checksum yang valid.'}
                 {barcodeFormat === 'UPCA' && 'Harus 12 digit angka.'}
@@ -233,7 +233,7 @@ export default function NewItemForm({ categories, units }: NewItemFormProps) {
 
         {/* Notes */}
         <fieldset>
-          <legend className="mb-4 text-base font-semibold text-gray-900">Keterangan</legend>
+          <legend className="mb-4 text-base font-semibold text-slate-900 dark:text-slate-100">Keterangan</legend>
           <textarea
             id="item-notes"
             name="notes"

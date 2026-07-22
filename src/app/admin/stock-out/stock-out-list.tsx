@@ -88,27 +88,27 @@ export default function StockOutList({
                 <th scope="col">Status</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody>
               {transactions.map((tx) => (
                 <tr key={tx.id} className={tx.is_reversed ? 'opacity-60' : ''}>
                   <td>
-                    <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono">
+                    <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-700 dark:bg-slate-800 dark:text-blue-300">
                       {tx.transaction_number}
                     </code>
                   </td>
                   <td>
-                    <span className="font-medium">{tx.items?.name ?? '—'}</span>
-                    <div className="text-xs text-gray-400">{tx.items?.sku}</div>
+                    <span className="font-medium text-slate-900 dark:text-slate-100">{tx.items?.name ?? '—'}</span>
+                    <div className="text-xs text-slate-400 dark:text-slate-500">{tx.items?.sku}</div>
                   </td>
                   <td className="text-sm">
                     {Number(tx.input_quantity).toLocaleString('id-ID')} {tx.units?.symbol}
                   </td>
                   <td className="text-sm">{Number(tx.stock_before).toLocaleString('id-ID')}</td>
                   <td className="text-sm">{Number(tx.stock_after).toLocaleString('id-ID')}</td>
-                  <td className="text-sm text-gray-600">
+                  <td className="text-sm text-slate-600 dark:text-slate-300">
                     {tx.profiles?.full_name ?? tx.profiles?.username ?? '—'}
                   </td>
-                  <td className="text-sm text-gray-500">
+                  <td className="text-sm text-slate-500 dark:text-slate-400">
                     {dtf.format(new Date(tx.transaction_at))}
                   </td>
                   <td>
@@ -127,7 +127,7 @@ export default function StockOutList({
 
       {totalPages > 1 && (
         <nav className="mt-4 flex items-center justify-between" aria-label="Navigasi halaman">
-          <p className="text-sm text-gray-600">Halaman {page} dari {totalPages}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Halaman {page} dari {totalPages}</p>
           <div className="flex gap-2">
             <button
               id="btn-prev-page-stockout"

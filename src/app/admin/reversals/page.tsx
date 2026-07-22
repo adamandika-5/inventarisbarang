@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+﻿import type { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import ReversalsClient from './reversals-client'
 
@@ -42,8 +42,8 @@ export default async function ReversalsPage({
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Koreksi Transaksi</h1>
-        <p className="mt-1 text-sm text-gray-500">
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Koreksi Transaksi</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
           Balik transaksi yang salah. Koreksi dibuat sebagai transaksi pembalikan baru.
         </p>
       </div>

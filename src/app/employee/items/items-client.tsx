@@ -55,29 +55,43 @@ export default function EmployeeItemsClient({
             const stock = Number(item.current_stock)
             const minStock = Number(item.minimum_stock)
             const isLow = stock <= minStock
+            const isZero = stock === 0
 
             return (
               <div key={item.id} className="card flex flex-col justify-between space-y-3">
                 <div>
                   <div className="flex items-start justify-between gap-2">
-                    <span className="inline-block rounded bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-700">
+                    {/* Category chip — theme-aware */}
+                    <span className="inline-block rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-100">
                       {item.categories?.name ?? 'Tanpa Kategori'}
                     </span>
-                    {isLow && (
-                      <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                    {isZero ? (
+                      <span className="inline-block rounded bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700 dark:bg-red-950/60 dark:text-red-300">
+                        Stok Habis
+                      </span>
+                    ) : isLow ? (
+                      <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
                         Stok Rendah
                       </span>
-                    )}
+                    ) : null}
                   </div>
-                  <h3 className="mt-2 text-base font-bold text-gray-900">{item.name}</h3>
-                  <p className="font-mono text-xs text-gray-500">
+                  <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-slate-100">{item.name}</h3>
+                  <p className="font-mono text-xs text-slate-500 dark:text-slate-400">
                     SKU: {item.sku} · Barcode: {item.barcode}
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-gray-100 pt-3">
-                  <span className="text-xs text-gray-500">Stok Tersedia:</span>
-                  <span className={`text-base font-bold ${isLow ? 'text-amber-600' : 'text-gray-900'}`}>
+                <div className="flex items-center justify-between border-t border-slate-200 pt-3 dark:border-slate-700">
+                  <span className="text-xs text-slate-500 dark:text-slate-400">Stok Tersedia:</span>
+                  <span
+                    className={`text-base font-bold ${
+                      isZero
+                        ? 'text-red-600 dark:text-red-400'
+                        : isLow
+                          ? 'text-amber-600 dark:text-amber-400'
+                          : 'text-slate-900 dark:text-slate-100'
+                    }`}
+                  >
                     {stock.toLocaleString('id-ID')} {item.base_unit?.symbol ?? ''}
                   </span>
                 </div>
@@ -86,7 +100,7 @@ export default function EmployeeItemsClient({
           })}
         </div>
       ) : (
-        <div className="card py-12 text-center text-sm text-gray-500">
+        <div className="card py-12 text-center text-sm text-slate-500 dark:text-slate-400">
           Tidak ada barang yang cocok dengan pencarian &quot;{query}&quot;.
         </div>
       )}

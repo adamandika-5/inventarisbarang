@@ -130,7 +130,7 @@ export default function ItemDetailClient({
           ) : (
             <span className="badge-nonaktif">Nonaktif</span>
           )}
-          <span className="text-sm text-gray-500">
+          <span className="text-sm text-slate-500 dark:text-slate-400">
             Stok: {stockNum.toLocaleString('id-ID')} {item.base_unit?.symbol ?? ''}
           </span>
         </div>
@@ -177,7 +177,7 @@ export default function ItemDetailClient({
       {/* Detail / Edit */}
       {isEditing ? (
         <form action={handleUpdate} className="card space-y-4">
-          <h2 className="text-base font-semibold text-gray-900">Edit Barang</h2>
+          <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Edit Barang</h2>
 
           <div>
             <label htmlFor="edit-item-name" className="label mb-1">Nama Barang</label>
@@ -248,8 +248,8 @@ export default function ItemDetailClient({
               ['Dibuat', new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' }).format(new Date(item.created_at))],
             ].map(([label, value]) => (
               <div key={String(label)}>
-                <dt className="text-sm font-medium text-gray-500">{label}</dt>
-                <dd className="mt-1 text-sm text-gray-900">{value}</dd>
+                <dt className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</dt>
+                <dd className="mt-1 text-sm text-slate-900 dark:text-slate-100">{value}</dd>
               </div>
             ))}
           </dl>
@@ -257,8 +257,8 @@ export default function ItemDetailClient({
           {/* Alternate units */}
           {item.item_units.length > 0 && (
             <div className="mt-6">
-              <h3 className="mb-2 text-sm font-semibold text-gray-700">Satuan Alternatif</h3>
-              <div className="overflow-x-auto rounded border border-gray-200">
+              <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Satuan Alternatif</h3>
+              <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-700">
                 <table className="table">
                   <thead>
                     <tr>
@@ -271,8 +271,8 @@ export default function ItemDetailClient({
                   <tbody>
                     {item.item_units.map((iu) => (
                       <tr key={iu.id}>
-                        <td>{iu.units?.name ?? '—'}</td>
-                        <td><code className="text-xs">{iu.units?.symbol ?? '—'}</code></td>
+                        <td className="text-slate-900 dark:text-slate-100">{iu.units?.name ?? '—'}</td>
+                        <td><code className="code-chip">{iu.units?.symbol ?? '—'}</code></td>
                         <td>{Number(iu.conversion_factor).toLocaleString('id-ID')} {item.base_unit?.symbol}/{iu.units?.symbol}</td>
                         <td>{iu.is_active ? <span className="badge-aman text-xs">Aktif</span> : <span className="badge-nonaktif text-xs">Nonaktif</span>}</td>
                       </tr>

@@ -96,7 +96,7 @@ export default function CategoriesClient({ initialCategories }: CategoriesClient
 
       {/* Header actions */}
       <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-slate-600 dark:text-slate-300">
           {activeCount} aktif &middot; {inactiveCount} nonaktif
         </p>
         <button
@@ -116,7 +116,7 @@ export default function CategoriesClient({ initialCategories }: CategoriesClient
       {/* Add form */}
       {showAddForm && (
         <div className="card mb-4">
-          <h2 className="mb-3 text-base font-semibold text-gray-900">Tambah Kategori</h2>
+          <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">Tambah Kategori</h2>
           <form
             ref={addFormRef}
             action={handleAdd}
@@ -151,7 +151,7 @@ export default function CategoriesClient({ initialCategories }: CategoriesClient
 
       {/* Category table */}
       {categories.length === 0 ? (
-        <div className="card py-12 text-center text-gray-500">
+        <div className="card py-12 text-center text-slate-500 dark:text-slate-400">
           <p className="text-lg font-medium">Belum ada kategori</p>
           <p className="mt-1 text-sm">Klik &ldquo;Tambah Kategori&rdquo; untuk memulai.</p>
         </div>
@@ -168,7 +168,7 @@ export default function CategoriesClient({ initialCategories }: CategoriesClient
                 </th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100 bg-white">
+            <tbody>
               {categories.map((category) => (
                 <tr key={category.id}>
                   <td>
@@ -205,7 +205,7 @@ export default function CategoriesClient({ initialCategories }: CategoriesClient
                         </button>
                       </form>
                     ) : (
-                      <span className="font-medium text-gray-900">{category.name}</span>
+                      <span className="font-medium text-slate-900 dark:text-slate-100">{category.name}</span>
                     )}
                   </td>
                   <td>
@@ -215,7 +215,7 @@ export default function CategoriesClient({ initialCategories }: CategoriesClient
                       <span className="badge-nonaktif">Nonaktif</span>
                     )}
                   </td>
-                  <td className="text-sm text-gray-500">
+                  <td className="text-sm text-slate-500 dark:text-slate-400">
                     {new Intl.DateTimeFormat('id-ID', {
                       dateStyle: 'medium',
                       timeZone: 'Asia/Jakarta',

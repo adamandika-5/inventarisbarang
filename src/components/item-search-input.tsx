@@ -116,14 +116,14 @@ export default function ItemSearchInput({
           aria-controls="item-search-results"
         />
         {isLoading && (
-          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 dark:text-slate-500">
             Memuat…
           </span>
         )}
         {!isLoading && query && (
           <button
             type="button"
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:text-slate-500 dark:hover:text-slate-300"
             onClick={handleClear}
             aria-label="Hapus pencarian"
           >
@@ -132,16 +132,16 @@ export default function ItemSearchInput({
         )}
       </div>
 
-      {/* Dropdown */}
+      {/* Dropdown — theme-aware */}
       {showDropdown && (
         <ul
           id="item-search-results"
           role="listbox"
-          className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-gray-200 bg-white shadow-lg"
+          className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800 dark:shadow-slate-950/60"
           aria-label="Hasil pencarian barang"
         >
           {results.length === 0 ? (
-            <li className="px-4 py-3 text-sm text-gray-500">Tidak ada barang ditemukan.</li>
+            <li className="px-4 py-3 text-sm text-slate-500 dark:text-slate-400">Tidak ada barang ditemukan.</li>
           ) : (
             results.map((item) => (
               <li key={item.id}>
@@ -149,11 +149,11 @@ export default function ItemSearchInput({
                   type="button"
                   role="option"
                   aria-selected={false}
-                  className="flex w-full flex-col px-4 py-2.5 text-left hover:bg-blue-50"
+                  className="flex w-full flex-col px-4 py-2.5 text-left transition-colors hover:bg-blue-50 dark:hover:bg-slate-700"
                   onClick={() => handleSelect(item)}
                 >
-                  <span className="text-sm font-medium text-gray-900">{item.name}</span>
-                  <span className="text-xs text-gray-500">
+                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{item.name}</span>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
                     SKU: {item.sku} · Stok: {Number(item.current_stock).toLocaleString('id-ID')}{' '}
                     {item.base_unit?.symbol}
                   </span>

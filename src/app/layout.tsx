@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
+import { themeScript } from '@/lib/theme-script'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -29,7 +30,14 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="id">
+    // suppressHydrationWarning prevents mismatch when inline script adds 'dark' class
+    // before React hydrates (the class is set by the inline script, not by React)
+    <html lang="id" suppressHydrationWarning>
+      <head>
+        {/* Anti-FOUC: apply theme before first paint */}
+        {/* eslint-disable-next-line react/no-danger */}
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
       <body className={`${inter.variable} font-sans antialiased`}>{children}</body>
     </html>
   )

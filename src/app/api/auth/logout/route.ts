@@ -33,7 +33,19 @@ export async function POST(_request: NextRequest) {
 
   await supabase.auth.signOut()
 
-  return NextResponse.json({ success: true })
+  // Explicitly clear any remaining supabase auth cookies
+  const allCookies = cookieStore.getAll()
+  for (const c of allCookies) {
+    if (c.name.includes('sb-') || c.name.includes('auth') || c.name.includes('token')) {
+      cookieStore.delete(c.name)
+    }
+  }
+
+  const response = NextResponse.json({ success: true })
+  response.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate')
+  response.headers.set('Pragma', 'no-cache')
+  response.headers.set('Expires', '0')
+  return response
 }
 
 export async function GET() {

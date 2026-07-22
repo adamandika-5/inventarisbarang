@@ -60,7 +60,7 @@ export default function NewEmployeeForm() {
             placeholder="huruf kecil, angka, titik, _ atau -"
             className="input font-mono"
           />
-          <p className="mt-1 text-xs text-gray-500">Huruf kecil, angka, titik, underscore, atau dash. Minimal 3 karakter.</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Huruf kecil, angka, titik, underscore, atau dash. Minimal 3 karakter.</p>
         </div>
 
         <div>
@@ -77,10 +77,10 @@ export default function NewEmployeeForm() {
             placeholder="Minimal 10 karakter"
             className="input"
           />
-          <p className="mt-1 text-xs text-gray-500">Minimal 10 karakter. Pegawai harus mengganti password ini saat pertama login.</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Minimal 10 karakter. Pegawai harus mengganti password ini saat pertama login.</p>
         </div>
 
-        <div className="rounded-md bg-blue-50 p-3 text-xs text-blue-700">
+        <div className="rounded-md bg-blue-50 p-3 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">
           Akun baru akan dibuat dengan peran <strong>Pegawai</strong>. Admin tidak dapat dibuat melalui antarmuka ini.
         </div>
       </div>

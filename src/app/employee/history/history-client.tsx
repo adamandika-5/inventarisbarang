@@ -39,8 +39,8 @@ export default function EmployeeHistoryClient({
     <div className="space-y-6">
       {/* Total Count Header Banner */}
       <div className="card flex items-center justify-between py-3">
-        <span className="text-sm font-medium text-gray-700">Total Pengambilan Barang</span>
-        <span className="rounded-full bg-primary-100 px-3 py-1 text-xs font-bold text-primary-800">
+        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Total Pengambilan Barang</span>
+        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
           {totalCount} Transaksi
         </span>
       </div>
@@ -50,7 +50,10 @@ export default function EmployeeHistoryClient({
         <div className="card overflow-hidden p-0">
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
-              <thead className="bg-gray-50 text-xs font-semibold uppercase text-gray-500">
+              <thead
+                className="text-xs font-semibold uppercase"
+                style={{ backgroundColor: 'var(--bg-table-head)', color: 'var(--text-muted)' }}
+              >
                 <tr>
                   <th className="px-4 py-3">No. Transaksi</th>
                   <th className="px-4 py-3">Jenis</th>
@@ -60,32 +63,47 @@ export default function EmployeeHistoryClient({
                   <th className="px-4 py-3">Waktu</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody>
                 {transactions.map((tx) => {
                   const item = Array.isArray(tx.items) ? tx.items[0] : tx.items
                   const unit = Array.isArray(tx.units) ? tx.units[0] : tx.units
 
                   return (
-                    <tr key={tx.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 font-mono text-xs font-medium text-gray-900">
-                        {tx.transaction_number}
+                    <tr
+                      key={tx.id}
+                      className="transition-colors"
+                      style={{ backgroundColor: 'var(--bg-table-row)' }}
+                      onMouseEnter={(e) => {
+                        ;(e.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-table-row-hover)'
+                      }}
+                      onMouseLeave={(e) => {
+                        ;(e.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-table-row)'
+                      }}
+                    >
+                      <td className="px-4 py-3">
+                        <code
+                          className="rounded px-1.5 py-0.5 font-mono text-xs font-medium"
+                          style={{ backgroundColor: 'var(--bg-code)', color: 'var(--text-code)' }}
+                        >
+                          {tx.transaction_number}
+                        </code>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800">
+                        <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
                           PENGAMBILAN
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-gray-900">{item?.name ?? '—'}</p>
-                        <p className="font-mono text-xs text-gray-500">SKU: {item?.sku ?? '—'}</p>
+                        <p className="font-medium text-slate-900 dark:text-slate-100">{item?.name ?? '—'}</p>
+                        <p className="font-mono text-xs text-slate-500 dark:text-slate-400">SKU: {item?.sku ?? '—'}</p>
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-amber-600">
+                      <td className="px-4 py-3 text-right font-bold text-amber-600 dark:text-amber-400">
                         -{String(tx.input_quantity)} {unit?.symbol ?? ''}
                       </td>
-                      <td className="px-4 py-3 text-right text-xs text-gray-600">
-                        {String(tx.stock_before)} &rarr; <strong>{String(tx.stock_after)}</strong>
+                      <td className="px-4 py-3 text-right text-xs text-slate-600 dark:text-slate-300">
+                        {String(tx.stock_before)} &rarr; <strong className="text-slate-900 dark:text-slate-100">{String(tx.stock_after)}</strong>
                       </td>
-                      <td className="px-4 py-3 text-xs text-gray-500">
+                      <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
                         {new Date(tx.transaction_at).toLocaleString('id-ID')}
                       </td>
                     </tr>
@@ -97,8 +115,11 @@ export default function EmployeeHistoryClient({
 
           {/* Pagination Controls */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-gray-100 px-4 py-3">
-              <span className="text-xs text-gray-500">
+            <div
+              className="flex items-center justify-between px-4 py-3"
+              style={{ borderTop: '1px solid var(--border-muted)' }}
+            >
+              <span className="text-xs text-slate-500 dark:text-slate-400">
                 Halaman {currentPage} dari {totalPages}
               </span>
               <div className="flex gap-2">
@@ -123,7 +144,7 @@ export default function EmployeeHistoryClient({
           )}
         </div>
       ) : (
-        <div className="card py-12 text-center text-sm text-gray-500">
+        <div className="card py-12 text-center text-sm text-slate-500 dark:text-slate-400">
           Belum ada riwayat pengambilan barang yang ditemukan.
         </div>
       )}

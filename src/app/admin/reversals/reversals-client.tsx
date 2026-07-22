@@ -109,7 +109,7 @@ export default function ReversalsClient({
       </div>
 
       {transactions.length === 0 ? (
-        <div className="card py-12 text-center text-gray-500">
+        <div className="card py-12 text-center text-slate-500 dark:text-slate-400">
           <p>Tidak ada transaksi yang dapat dibalik.</p>
         </div>
       ) : (
@@ -118,10 +118,10 @@ export default function ReversalsClient({
             <div key={tx.id} className="card">
               <div className="flex items-start justify-between">
                 <div>
-                  <code className="text-xs bg-gray-100 rounded px-1.5 py-0.5">{tx.transaction_number}</code>
-                  <span className="ml-2 text-xs text-gray-500">{tx.transaction_type}</span>
-                  <p className="mt-1 font-medium">{tx.items?.name ?? '—'}</p>
-                  <p className="text-sm text-gray-500">
+                  <code className="code-chip">{tx.transaction_number}</code>
+                  <span className="ml-2 text-xs text-slate-500 dark:text-slate-400">{tx.transaction_type}</span>
+                  <p className="mt-1 font-medium text-slate-900 dark:text-slate-100">{tx.items?.name ?? '—'}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
                     {Number(tx.input_quantity).toLocaleString('id-ID')} {tx.units?.symbol}
                     {' · '}Oleh: {tx.profiles?.full_name ?? tx.profiles?.username ?? '—'}
                     {' · '}{dtf.format(new Date(tx.transaction_at))}
@@ -139,7 +139,7 @@ export default function ReversalsClient({
               </div>
 
               {reversing === tx.id && (
-                <div className="mt-3 border-t border-gray-100 pt-3">
+                <div className="mt-3 border-t pt-3" style={{ borderColor: 'var(--border-muted)' }}>
                   <label htmlFor={`reason-${tx.id}`} className="label mb-1">
                     Alasan Pembalikan <span className="text-red-500">*</span>
                   </label>
@@ -181,7 +181,7 @@ export default function ReversalsClient({
 
       {totalPages > 1 && (
         <nav className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-gray-600">Halaman {page} dari {totalPages}</p>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Halaman {page} dari {totalPages}</p>
           <div className="flex gap-2">
             <button type="button" className="btn-secondary text-sm"
               onClick={() => updateParam('page', String(page - 1))} disabled={page <= 1}>
