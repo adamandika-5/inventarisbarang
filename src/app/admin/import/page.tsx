@@ -1,4 +1,4 @@
-﻿import type { Metadata } from 'next'
+import type { Metadata } from 'next'
 import ImportClient from './import-client'
 
 export const metadata: Metadata = {
@@ -17,9 +17,9 @@ export default function ImportPage() {
       </div>
 
       {/* Info box */}
-      <div className="alert-info mb-6">
-        <p className="font-medium">Sebelum mengimpor:</p>
-        <ul className="mt-1 list-inside list-disc space-y-0.5 text-xs">
+      <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50/70 p-4 text-slate-800 dark:border-[#22D3EE]/30 dark:bg-[#0B1220] dark:text-white shadow-sm">
+        <p className="font-semibold text-blue-900 dark:text-[#22D3EE]">Sebelum mengimpor:</p>
+        <ul className="mt-1.5 list-inside list-disc space-y-1 text-xs text-slate-700 dark:text-slate-200">
           <li>Pastikan kategori dan satuan barang sudah dibuat di sistem.</li>
           <li>Barcode harus unik dan belum ada di database.</li>
           <li>SKU biarkan kosong untuk di-generate otomatis (format ATK-XXXX).</li>

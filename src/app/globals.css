@@ -80,49 +80,34 @@
     color-scheme: light;
   }
 
-  /* ── Dark Mode ─────────────────────────────────────────────────────────────── */
+  /* ── Dark Mode (Navy Theme — #0B1220 / #101D31 / #17263D / #22D3EE) ── */
   .dark {
-    --bg-page: #0f172a;
-    /* slate-900 */
-    --bg-card: #1e293b;
-    /* slate-800 */
-    --bg-sidebar: #1e293b;
-    --bg-nav: #1e293b;
-    --bg-input: #1e293b;
-    --bg-table-head: #0f172a;
-    /* slate-900 — header lebih gelap */
-    --bg-table-row: #1e293b;
-    /* slate-800 — baris ganjil */
-    --bg-table-row-alt: #172033;
-    /* slate-850 — baris genap lebih gelap sedikit */
-    --bg-table-row-hover: #293548;
-    /* slate-750 — hover jelas tapi tidak menyilaukan */
-    --bg-muted: #334155;
-    /* slate-700 */
-    --bg-code: #0f172a;
-    /* slate-900 — chip SKU/kode */
+    --bg-page: #0b1220;
+    --bg-card: #17263d;
+    --bg-sidebar: #101d31;
+    --bg-nav: #101d31;
+    --bg-input: #0b1220;
+    --bg-table-head: #0b1220;
+    --bg-table-row: #17263d;
+    --bg-table-row-alt: #121e33;
+    --bg-table-row-hover: #203552;
+    --bg-muted: #203552;
+    --bg-code: #0b1220;
 
-    --text-primary: #f1f5f9;
-    /* slate-100 */
-    --text-secondary: #cbd5e1;
-    /* slate-300 */
-    --text-muted: #94a3b8;
-    /* slate-400 */
-    --text-faint: #64748b;
-    /* slate-500 */
-    --text-label: #cbd5e1;
-    --text-code: #7dd3fc;
-    /* sky-300 — teks chip SKU */
+    --text-primary: #f8fafc;
+    --text-secondary: #aab6c8;
+    --text-muted: #8494ab;
+    --text-faint: #5a6b82;
+    --text-label: #f8fafc;
+    --text-code: #22d3ee;
 
-    --border-default: #334155;
-    /* slate-700 */
-    --border-muted: #253041;
-    /* sedikit lebih terang dari row agar divider terlihat */
-    --border-input: #475569;
-    /* slate-600 */
+    --border-default: rgba(255, 255, 255, 0.12);
+    --border-muted: rgba(255, 255, 255, 0.08);
+    --border-input: rgba(255, 255, 255, 0.20);
 
-    --brand-50: #172554;
-    --brand-100: #1e3a8a;
+    --brand-50: #083344;
+    --brand-100: #0e7490;
+    --brand-600: #22d3ee;
 
     --success-bg: #052e16;
     --success-border: #166534;
@@ -133,17 +118,17 @@
     --warning-bg: #422006;
     --warning-border: #92400e;
     --warning-text: #fbbf24;
-    --info-bg: #172554;
-    --info-border: #1e3a8a;
-    --info-text: #60a5fa;
+    --info-bg: #083344;
+    --info-border: #0e7490;
+    --info-text: #22d3ee;
 
-    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.3);
-    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
 
-    /* Scrollbar — dark */
-    --scrollbar-track: #0f172a;
-    --scrollbar-thumb: #475569;
-    --scrollbar-thumb-hover: #64748b;
+    /* Scrollbar — Navy (#0B1220 track) */
+    --scrollbar-track: #0b1220;
+    --scrollbar-thumb: #1e2f47;
+    --scrollbar-thumb-hover: #2c4466;
 
     color-scheme: dark;
   }
@@ -333,7 +318,7 @@
   .code-chip {
     background-color: var(--bg-code);
     color: var(--text-code);
-    @apply rounded px-1.5 py-0.5 text-xs font-mono font-medium;
+    @apply rounded px-1.5 py-0.5 text-xs font-mono font-medium border border-transparent dark:border-white/10;
   }
 
   /* ── Alerts ─────────────────────────────────────────────────────────────────── */

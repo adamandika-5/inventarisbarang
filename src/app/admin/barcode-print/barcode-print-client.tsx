@@ -122,9 +122,10 @@ function BarcodeLabel({ item, index }: { item: Item; index: number }) {
 
 interface BarcodePrintClientProps {
   items: Item[]
+  defaultLabelCount?: number
 }
 
-export default function BarcodePrintClient({ items }: BarcodePrintClientProps) {
+export default function BarcodePrintClient({ items, defaultLabelCount = 1 }: BarcodePrintClientProps) {
   const [search, setSearch] = useState('')
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([])
   const [copiesInput, setCopiesInput] = useState<Record<string, string>>({})
@@ -142,8 +143,9 @@ export default function BarcodePrintClient({ items }: BarcodePrintClientProps) {
     if (isSelected(item.id)) {
       setSelectedItems((prev) => prev.filter((s) => s.item.id !== item.id))
     } else {
-      setSelectedItems((prev) => [...prev, { item, copies: 1 }])
-      setCopiesInput((prev) => ({ ...prev, [item.id]: '1' }))
+      const initialCopies = defaultLabelCount >= 1 && defaultLabelCount <= 500 ? defaultLabelCount : 1
+      setSelectedItems((prev) => [...prev, { item, copies: initialCopies }])
+      setCopiesInput((prev) => ({ ...prev, [item.id]: String(initialCopies) }))
     }
   }
 
@@ -204,7 +206,7 @@ export default function BarcodePrintClient({ items }: BarcodePrintClientProps) {
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left panel: item selector */}
         <div className="card">
-          <h2 className="mb-3 text-base font-semibold text-gray-900">Pilih Barang</h2>
+          <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-white">Pilih Barang</h2>
 
           <div className="mb-3">
             <input
@@ -219,9 +221,9 @@ export default function BarcodePrintClient({ items }: BarcodePrintClientProps) {
           </div>
 
           {items.length === 0 ? (
-            <div className="rounded-md border border-dashed border-gray-300 py-10 text-center">
+            <div className="rounded-md border border-dashed border-slate-300 dark:border-white/20 py-10 text-center">
               <svg
-                className="mx-auto mb-2 h-10 w-10 text-gray-300"
+                className="mx-auto mb-2 h-10 w-10 text-slate-300 dark:text-slate-500"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -234,14 +236,14 @@ export default function BarcodePrintClient({ items }: BarcodePrintClientProps) {
                   d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
                 />
               </svg>
-              <p className="text-sm text-gray-500">Belum ada barang aktif.</p>
-              <p className="mt-1 text-xs text-gray-400">Tambahkan barang di menu Data Barang terlebih dahulu.</p>
+              <p className="text-sm text-slate-500 dark:text-slate-300 font-medium">Belum ada barang aktif.</p>
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">Tambahkan barang di menu Data Barang terlebih dahulu.</p>
             </div>
           ) : filteredItems.length === 0 ? (
-            <p className="py-6 text-center text-sm text-gray-500">Tidak ada barang yang cocok.</p>
+            <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-300">Tidak ada barang yang cocok.</p>
           ) : (
             <ul
-              className="max-h-96 divide-y divide-gray-100 overflow-y-auto rounded-md border border-gray-200"
+              className="max-h-96 divide-y divide-slate-100 dark:divide-white/10 overflow-y-auto rounded-md border border-slate-200 dark:border-white/10"
               aria-label="Daftar barang"
             >
               {filteredItems.map((item) => {
@@ -256,17 +258,17 @@ export default function BarcodePrintClient({ items }: BarcodePrintClientProps) {
                       disabled={!valid}
                       className={`flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors ${
                         selected
-                          ? 'bg-blue-50 text-blue-900'
+                          ? 'bg-blue-50 text-blue-900 dark:bg-[#22D3EE]/20 dark:text-[#22D3EE]'
                           : valid
-                            ? 'text-gray-800 hover:bg-gray-50'
-                            : 'cursor-not-allowed text-gray-400 opacity-50'
+                            ? 'text-slate-800 dark:text-white hover:bg-slate-50 dark:hover:bg-[#203552]'
+                            : 'cursor-not-allowed text-slate-400 dark:text-slate-500 opacity-60'
                       }`}
                       aria-pressed={selected}
                       title={valid ? undefined : 'Barcode kosong atau tidak valid — tidak dapat dicetak'}
                     >
                       <span
                         className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border text-xs font-bold ${
-                          selected ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-300 bg-white'
+                          selected ? 'border-blue-600 bg-blue-600 dark:border-[#22D3EE] dark:bg-[#22D3EE] text-white dark:text-[#0B1220]' : 'border-slate-300 dark:border-white/20 bg-white dark:bg-[#0B1220]'
                         }`}
                         aria-hidden="true"
                       >
@@ -274,7 +276,7 @@ export default function BarcodePrintClient({ items }: BarcodePrintClientProps) {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate font-medium">{item.name}</span>
-                        <span className="block text-xs text-gray-400">
+                        <span className="block text-xs text-slate-400 dark:text-slate-400">
                           {item.sku} · {item.barcode_format}
                           {!valid && ' · Barcode tidak valid'}
                         </span>
@@ -290,10 +292,10 @@ export default function BarcodePrintClient({ items }: BarcodePrintClientProps) {
         {/* Right panel: selected items + copy count + print button */}
         <div className="card">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-base font-semibold text-gray-900">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-white">
               Label Dipilih
               {selectedItems.length > 0 && (
-                <span className="ml-1 text-sm font-normal text-gray-500">
+                <span className="ml-1 text-sm font-normal text-slate-500 dark:text-slate-400">
                   ({selectedItems.length} barang, {totalLabels} label)
                 </span>
               )}
@@ -303,7 +305,7 @@ export default function BarcodePrintClient({ items }: BarcodePrintClientProps) {
                 type="button"
                 id="btn-clear-selection"
                 onClick={() => setSelectedItems([])}
-                className="text-xs text-red-500 hover:text-red-700"
+                className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300"
               >
                 Hapus Semua
               </button>
@@ -311,20 +313,20 @@ export default function BarcodePrintClient({ items }: BarcodePrintClientProps) {
           </div>
 
           {selectedItems.length === 0 ? (
-            <div className="rounded-md border border-dashed border-gray-300 py-10 text-center">
-              <p className="text-sm text-gray-500">Belum ada barang dipilih.</p>
-              <p className="mt-1 text-xs text-gray-400">Pilih barang dari daftar di sebelah kiri.</p>
+            <div className="rounded-md border border-dashed border-slate-300 dark:border-white/20 py-10 text-center">
+              <p className="text-sm text-slate-500 dark:text-slate-300 font-medium">Belum ada barang dipilih.</p>
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">Pilih barang dari daftar di sebelah kiri.</p>
             </div>
           ) : (
             <ul className="mb-4 max-h-72 space-y-2 overflow-y-auto">
               {selectedItems.map(({ item, copies }) => (
                 <li
                   key={item.id}
-                  className="flex items-center gap-3 rounded-md border border-gray-200 bg-gray-50 px-3 py-2"
+                  className="flex items-center gap-3 rounded-md border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#0B1220] px-3 py-2"
                 >
-                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-gray-800">
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-white">
                     {item.name}
-                    <span className="ml-1 text-xs font-normal text-gray-400">{item.sku}</span>
+                    <span className="ml-1 text-xs font-normal text-slate-400 dark:text-slate-400">{item.sku}</span>
                   </span>
                   <div className="flex items-center gap-1">
                     <label htmlFor={`copies-${item.id}`} className="sr-only">
@@ -361,7 +363,7 @@ export default function BarcodePrintClient({ items }: BarcodePrintClientProps) {
             id="btn-print-barcode"
             onClick={handlePrint}
             disabled={totalLabels === 0}
-            className="btn-primary w-full disabled:opacity-40"
+            className="btn-primary w-full disabled:bg-slate-200 dark:disabled:bg-[#203552] disabled:text-slate-400 dark:disabled:text-[#8494ab] disabled:opacity-100"
           >
             <svg
               className="mr-2 h-4 w-4"
@@ -385,12 +387,12 @@ export default function BarcodePrintClient({ items }: BarcodePrintClientProps) {
       {/* Print preview */}
       {totalLabels > 0 && (
         <div className="mt-6">
-          <h2 className="mb-3 text-base font-semibold text-gray-900">
+          <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-white">
             Preview Label ({totalLabels})
           </h2>
           <div
             id="barcode-print-area"
-            className="rounded-lg border border-gray-200 bg-gray-50 p-4"
+            className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#0B1220] p-4"
           >
             <div className="print-grid flex flex-wrap gap-3">
               {printLabels.map(({ item, key }, index) => (

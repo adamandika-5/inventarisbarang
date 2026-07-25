@@ -150,8 +150,8 @@ export default function StockOutClient() {
         </label>
         <ItemSearchInput onSelect={(item) => handleSelectItem(item ? (item as unknown as SelectedItem) : null)} />
         {selectedItem && (
-          <div className="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-700 dark:bg-slate-700/60 dark:text-slate-300">
-            <p className="font-semibold text-slate-900 dark:text-slate-100">{selectedItem.name}</p>
+          <div className="mt-2 rounded-lg bg-slate-50 p-3 text-xs text-slate-700 dark:bg-[#0B1220] dark:text-slate-300 border border-slate-200 dark:border-white/10">
+            <p className="font-semibold text-slate-900 dark:text-white">{selectedItem.name}</p>
             <p>SKU: {selectedItem.sku} · Stok saat ini: {Number(selectedItem.current_stock).toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
           </div>
         )}
@@ -230,7 +230,7 @@ export default function StockOutClient() {
         <button
           type="submit"
           onClick={handleSubmit}
-          className="btn-primary"
+          className="btn-primary disabled:bg-slate-200 dark:disabled:bg-[#203552] disabled:text-slate-400 dark:disabled:text-[#8494ab] disabled:opacity-100"
           disabled={!selectedItem || !isValidQty || !isStockSufficient || isPending}
         >
           {isPending ? 'Menyimpan...' : 'Catat Barang Keluar'}

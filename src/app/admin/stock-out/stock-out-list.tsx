@@ -92,13 +92,13 @@ export default function StockOutList({
               {transactions.map((tx) => (
                 <tr key={tx.id} className={tx.is_reversed ? 'opacity-60' : ''}>
                   <td>
-                    <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-700 dark:bg-slate-800 dark:text-blue-300">
+                    <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-700 dark:bg-[#0B1220] dark:text-[#22D3EE] dark:border dark:border-white/10">
                       {tx.transaction_number}
                     </code>
                   </td>
                   <td>
-                    <span className="font-medium text-slate-900 dark:text-slate-100">{tx.items?.name ?? '—'}</span>
-                    <div className="text-xs text-slate-400 dark:text-slate-500">{tx.items?.sku}</div>
+                    <span className="font-medium text-slate-900 dark:text-white">{tx.items?.name ?? '—'}</span>
+                    <div className="text-xs text-slate-400 dark:text-slate-400">{tx.items?.sku}</div>
                   </td>
                   <td className="text-sm">
                     {Number(tx.input_quantity).toLocaleString('id-ID')} {tx.units?.symbol}

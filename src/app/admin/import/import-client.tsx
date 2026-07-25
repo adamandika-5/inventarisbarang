@@ -122,14 +122,14 @@ export default function ImportClient() {
             (s === 'preview' && step === 'result')
           return (
             <span key={s} className="flex items-center gap-2">
-              {i > 0 && <span className="text-gray-300">›</span>}
+              {i > 0 && <span className="text-slate-300 dark:text-slate-600">›</span>}
               <span
-                className={`rounded-full px-3 py-1 font-medium ${
+                className={`rounded-full px-3 py-1 font-medium transition-colors ${
                   isActive
-                    ? 'bg-blue-600 text-white'
+                    ? 'bg-blue-600 dark:bg-[#22D3EE] text-white dark:text-[#0B1220] font-bold'
                     : isDone
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-gray-100 text-gray-500'
+                      ? 'bg-green-100 dark:bg-emerald-950/60 text-green-700 dark:text-emerald-300 dark:border dark:border-emerald-700/50'
+                      : 'bg-slate-100 dark:bg-[#17263D] text-slate-500 dark:text-slate-300 border border-transparent dark:border-white/10'
                 }`}
               >
                 {labels[s]}
@@ -144,8 +144,8 @@ export default function ImportClient() {
         <div className="card space-y-4">
           <div className="flex items-start justify-between">
             <div>
-              <h2 className="text-base font-semibold text-gray-900">Upload File Excel atau CSV</h2>
-              <p className="mt-1 text-sm text-gray-500">
+              <h2 className="text-base font-semibold text-slate-900 dark:text-white">Upload File Excel atau CSV</h2>
+              <p className="mt-1 text-sm text-slate-500 dark:text-slate-300">
                 Maksimum 500 baris, ukuran file maks 6 MB. Format: .xlsx atau .csv.
               </p>
             </div>
@@ -167,12 +167,12 @@ export default function ImportClient() {
             htmlFor="import-file-input"
             className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed py-10 transition-colors ${
               selectedFile
-                ? 'border-green-400 bg-green-50 dark:border-green-700 dark:bg-green-950/30'
-                : 'border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50 dark:border-slate-600 dark:bg-slate-800/50 dark:hover:border-blue-500 dark:hover:bg-blue-950/30'
+                ? 'border-green-400 bg-green-50 dark:border-emerald-500/50 dark:bg-emerald-950/30'
+                : 'border-slate-300 bg-slate-50 hover:border-blue-400 hover:bg-blue-50 dark:border-[#22D3EE]/40 dark:bg-[#0B1220] dark:hover:border-[#22D3EE] dark:hover:bg-[#203552]'
             }`}
           >
             <svg
-              className={`mb-3 h-10 w-10 ${selectedFile ? 'text-green-500' : 'text-slate-400 dark:text-slate-500'}`}
+              className={`mb-3 h-10 w-10 ${selectedFile ? 'text-green-500 dark:text-emerald-400' : 'text-slate-400 dark:text-[#22D3EE]'}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -187,14 +187,14 @@ export default function ImportClient() {
             </svg>
             {selectedFile ? (
               <div className="text-center">
-                <p className="font-medium text-green-700">{selectedFile.name}</p>
-                <p className="mt-1 text-xs text-green-600">
+                <p className="font-medium text-green-700 dark:text-emerald-300">{selectedFile.name}</p>
+                <p className="mt-1 text-xs text-green-600 dark:text-emerald-400">
                   {(selectedFile.size / 1024).toFixed(1)} KB
                 </p>
               </div>
             ) : (
               <div className="text-center">
-                <p className="font-medium text-slate-700 dark:text-slate-300">Klik untuk memilih file</p>
+                <p className="font-medium text-slate-700 dark:text-white">Klik untuk memilih file</p>
                 <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">atau seret dan lepas di sini</p>
               </div>
             )}
@@ -218,7 +218,7 @@ export default function ImportClient() {
               id="btn-parse-file"
               onClick={handleParse}
               disabled={!selectedFile || isParsing}
-              className="btn-primary disabled:opacity-40"
+              className="btn-primary disabled:bg-slate-200 dark:disabled:bg-[#203552] disabled:text-slate-400 dark:disabled:text-[#8494ab] disabled:opacity-100"
             >
               {isParsing ? 'Membaca file…' : 'Baca & Preview'}
             </button>
@@ -292,7 +292,7 @@ export default function ImportClient() {
               id="btn-confirm-import"
               onClick={handleConfirm}
               disabled={isConfirming || previewRows.length === 0}
-              className="btn-primary disabled:opacity-40"
+              className="btn-primary disabled:bg-slate-200 dark:disabled:bg-[#203552] disabled:text-slate-400 dark:disabled:text-[#8494ab] disabled:opacity-100"
             >
               {isConfirming
                 ? 'Menyimpan…'

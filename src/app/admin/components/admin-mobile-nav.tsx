@@ -70,13 +70,13 @@ export default function AdminMobileNav({ fullName }: AdminMobileNavProps) {
   return (
     <>
       {/* Mobile top bar */}
-      <header className="flex h-14 items-center justify-between border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 shadow-sm lg:hidden">
+      <header className="flex h-14 items-center justify-between border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#101D31] px-4 shadow-sm lg:hidden">
         <div className="flex items-center">
           <button
             type="button"
             id="btn-mobile-menu"
             onClick={() => setIsOpen(true)}
-            className="rounded-md p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-slate-900 dark:hover:text-white"
+            className="rounded-md p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#203552] hover:text-slate-900 dark:hover:text-white"
             aria-label="Buka menu"
             aria-expanded={isOpen}
             aria-controls="mobile-menu"
@@ -93,7 +93,7 @@ export default function AdminMobileNav({ fullName }: AdminMobileNavProps) {
       {/* Overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           aria-hidden="true"
           onClick={() => setIsOpen(false)}
         />
@@ -102,16 +102,16 @@ export default function AdminMobileNav({ fullName }: AdminMobileNavProps) {
       {/* Drawer */}
       <nav
         id="mobile-menu"
-        className={`fixed inset-y-0 left-0 z-50 w-72 transform bg-white dark:bg-slate-800 shadow-xl transition-transform duration-200 lg:hidden ${isOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-50 w-72 transform bg-white dark:bg-[#101D31] shadow-xl transition-transform duration-200 lg:hidden ${isOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         aria-label="Menu mobile admin"
       >
-        <div className="flex h-14 items-center justify-between border-b border-slate-200 dark:border-slate-700 px-4">
+        <div className="flex h-14 items-center justify-between border-b border-slate-200 dark:border-white/10 px-4">
           <span className="text-lg font-bold text-slate-900 dark:text-white">Menu Admin</span>
           <button
             type="button"
             onClick={() => setIsOpen(false)}
-            className="rounded-md p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-700"
+            className="rounded-md p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#203552]"
             aria-label="Tutup menu"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
@@ -127,8 +127,8 @@ export default function AdminMobileNav({ fullName }: AdminMobileNavProps) {
                 href={item.href}
                 onClick={() => setIsOpen(false)}
                 className={`flex items-center rounded-md px-3 py-2.5 text-sm font-medium transition-colors ${isActive(item.href, item.exact)
-                    ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 font-semibold'
-                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'
+                    ? 'bg-blue-50 dark:bg-[#22D3EE]/10 text-blue-700 dark:text-[#22D3EE] font-semibold'
+                    : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#203552]'
                   }`}
                 aria-current={isActive(item.href, item.exact) ? 'page' : undefined}
               >
@@ -138,7 +138,7 @@ export default function AdminMobileNav({ fullName }: AdminMobileNavProps) {
           ))}
         </ul>
 
-        <div className="border-t border-slate-200 dark:border-slate-700 p-4">
+        <div className="border-t border-slate-200 dark:border-white/10 p-4">
           <p className="mb-3 text-sm font-medium text-slate-900 dark:text-white">{fullName}</p>
           {errorMsg && (
             <p className="mb-2 text-xs text-red-600 dark:text-red-400 font-medium">{errorMsg}</p>
@@ -147,7 +147,7 @@ export default function AdminMobileNav({ fullName }: AdminMobileNavProps) {
             <Link
               href="/admin/account"
               onClick={() => setIsOpen(false)}
-              className="flex-1 rounded-md border border-slate-300 dark:border-slate-600 px-3 py-2 text-center text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700"
+              className="flex-1 rounded-md border border-slate-300 dark:border-white/20 px-3 py-2 text-center text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#203552]"
             >
               Akun
             </Link>

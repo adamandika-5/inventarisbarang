@@ -137,7 +137,7 @@ export default function ItemSearchInput({
         <ul
           id="item-search-results"
           role="listbox"
-          className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg dark:border-slate-700 dark:bg-slate-800 dark:shadow-slate-950/60"
+          className="absolute z-20 mt-1 max-h-60 w-full overflow-y-auto rounded-md border border-slate-200 bg-white shadow-lg dark:border-white/10 dark:bg-[#17263D] dark:shadow-black/60"
           aria-label="Hasil pencarian barang"
         >
           {results.length === 0 ? (
@@ -149,10 +149,10 @@ export default function ItemSearchInput({
                   type="button"
                   role="option"
                   aria-selected={false}
-                  className="flex w-full flex-col px-4 py-2.5 text-left transition-colors hover:bg-blue-50 dark:hover:bg-slate-700"
+                  className="flex w-full flex-col px-4 py-2.5 text-left transition-colors hover:bg-blue-50 dark:hover:bg-[#203552]"
                   onClick={() => handleSelect(item)}
                 >
-                  <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{item.name}</span>
+                  <span className="text-sm font-medium text-slate-900 dark:text-white">{item.name}</span>
                   <span className="text-xs text-slate-500 dark:text-slate-400">
                     SKU: {item.sku} · Stok: {Number(item.current_stock).toLocaleString('id-ID')}{' '}
                     {item.base_unit?.symbol}

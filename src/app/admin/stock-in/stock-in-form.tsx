@@ -46,7 +46,8 @@ interface StockInFormProps {
 export default function StockInForm({ preselectedItem }: StockInFormProps) {
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(preselectedItem)
   const [selectedUnit, setSelectedUnit] = useState<UnitOption | null>(null)
-  const [quantity, setQuantity] = useState(1)
+  const [quantity, setQuantity] = useState<string>('1')
+  const [quantityError, setQuantityError] = useState<string | null>(null)
   const [price, setPrice] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
   const [isPending, startTransition] = useTransition()
@@ -87,7 +88,8 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
   const handleItemSelect = (item: SelectedItem) => {
     setSelectedItem(item)
     setSelectedUnit(null)
-    setQuantity(1)
+    setQuantity('1')
+    setQuantityError(null)
     setPrice('')
     setShowConfirm(false)
     clientRequestIdRef.current = crypto.randomUUID()
@@ -136,19 +138,22 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
     }, 0)
   }
 
+  const parsedQty = Number(quantity)
+  const isQtyValid = quantity !== '' && Number.isInteger(parsedQty) && parsedQty >= 1
+
   const priceNum = parseInt(price, 10) || 0
-  const simulation = selectedItem && selectedUnit && quantity > 0 && priceNum > 0
+  const simulation = selectedItem && selectedUnit && isQtyValid && priceNum > 0
     ? simulateMovingAverage(
         Number(selectedItem.current_stock),
         0, // We don't have current inventory value client-side (price is private)
-        quantity,
+        parsedQty,
         selectedUnit.conversion_factor,
         priceNum,
       )
     : null
 
-  const baseQuantity = selectedUnit ? quantity * selectedUnit.conversion_factor : 0
-  const totalCost = priceNum > 0 ? quantity * priceNum : 0
+  const baseQuantity = selectedUnit && isQtyValid ? parsedQty * selectedUnit.conversion_factor : 0
+  const totalCost = priceNum > 0 && isQtyValid ? parsedQty * priceNum : 0
 
   const formatRp = (val: number) =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val)
@@ -170,7 +175,8 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
         // Reset form
         setSelectedItem(null)
         setSelectedUnit(null)
-        setQuantity(1)
+        setQuantity('1')
+        setQuantityError(null)
         setPrice('')
         formRef.current?.reset()
         clientRequestIdRef.current = crypto.randomUUID()
@@ -188,7 +194,20 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
         </div>
       )}
 
-      <form ref={formRef} onSubmit={(e) => { e.preventDefault(); setShowConfirm(true) }}>
+      <form
+        ref={formRef}
+        onSubmit={(e) => {
+          e.preventDefault()
+          const pQty = Number(quantity)
+          if (quantity === '' || !Number.isInteger(pQty) || pQty < 1) {
+            setQuantityError('Jumlah barang minimal 1.')
+            showMsg('error', 'Jumlah barang minimal 1.')
+            return
+          }
+          setQuantityError(null)
+          setShowConfirm(true)
+        }}
+      >
         {/* Hidden fields */}
         <input type="hidden" name="client_request_id" value={clientRequestIdRef.current} />
         <input type="hidden" name="item_id" value={selectedItem?.id ?? ''} />
@@ -208,7 +227,7 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
 
           {selectedItem && (
             <>
-              <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700">
+              <div className="rounded-md bg-blue-50 dark:bg-[#22D3EE]/10 border border-blue-200 dark:border-[#22D3EE]/30 p-3 text-sm text-blue-700 dark:text-[#22D3EE]">
                 <p className="font-medium">{selectedItem.name}</p>
                 <p className="text-xs">SKU: {selectedItem.sku} · Stok saat ini: {Number(selectedItem.current_stock).toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
               </div>
@@ -244,10 +263,29 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
                   step={1}
                   required
                   value={quantity}
-                  onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  className="input"
+                  onChange={(e) => {
+                    const val = e.target.value
+                    if (val === '' || /^\d+$/.test(val)) {
+                      setQuantity(val)
+                      if (val !== '' && Number(val) >= 1 && Number.isInteger(Number(val))) {
+                        setQuantityError(null)
+                      }
+                    }
+                  }}
+                  onBlur={() => {
+                    const pQty = Number(quantity)
+                    if (quantity === '' || !Number.isInteger(pQty) || pQty < 1) {
+                      setQuantityError('Jumlah barang minimal 1.')
+                    } else {
+                      setQuantityError(null)
+                    }
+                  }}
+                  className={`input ${quantityError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                 />
-                {selectedUnit && (
+                {quantityError && (
+                  <p className="mt-1 text-xs text-red-600 dark:text-red-400">{quantityError}</p>
+                )}
+                {selectedUnit && isQtyValid && (
                   <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
                     = {baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}
                   </p>
@@ -287,8 +325,8 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
 
               {/* Simulation summary */}
               {simulation && (
-                <div className="rounded-md bg-slate-50 p-3 text-sm dark:bg-slate-700/60">
-                  <p className="font-medium text-slate-700 dark:text-slate-200">Ringkasan Transaksi (Simulasi)</p>
+                <div className="rounded-md bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-white/10 p-3 text-sm">
+                  <p className="font-medium text-slate-700 dark:text-white">Ringkasan Transaksi (Simulasi)</p>
                   <div className="mt-2 space-y-1 text-slate-600 dark:text-slate-300">
                     <div className="flex justify-between">
                       <span>Jumlah (satuan dasar)</span>
@@ -300,9 +338,9 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
                     </div>
                     <div className="flex justify-between">
                       <span>Perkiraan stok baru</span>
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{simulation.newStock.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</span>
+                      <span className="font-medium text-slate-900 dark:text-white">{simulation.newStock.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</span>
                     </div>
-                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-500">* Harga rata-rata baru dihitung ulang oleh server.</p>
+                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">* Harga rata-rata baru dihitung ulang oleh server.</p>
                   </div>
                 </div>
               )}
@@ -314,7 +352,13 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
           <button
             type="button"
             className="btn-secondary"
-            onClick={() => { setSelectedItem(null); setSelectedUnit(null); setQuantity(1); setPrice('') }}
+            onClick={() => {
+              setSelectedItem(null)
+              setSelectedUnit(null)
+              setQuantity('1')
+              setQuantityError(null)
+              setPrice('')
+            }}
             disabled={isPending}
           >
             Reset
@@ -323,7 +367,7 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
             id="btn-konfirmasi-barang-masuk"
             type="submit"
             className="btn-primary"
-            disabled={isPending || !selectedItem || !selectedUnit || quantity < 1 || !price}
+            disabled={isPending || !selectedItem || !selectedUnit || !isQtyValid || !price}
           >
             {isPending ? 'Memproses…' : 'Konfirmasi Barang Masuk'}
           </button>
@@ -333,18 +377,18 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
       {/* Confirm dialog */}
       {showConfirm && selectedItem && selectedUnit && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
           role="dialog"
           aria-modal="true"
           aria-labelledby="confirm-title"
         >
-          <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-slate-800">
-            <h2 id="confirm-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+          <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-[#17263D] border border-slate-200 dark:border-white/10">
+            <h2 id="confirm-title" className="text-lg font-semibold text-slate-900 dark:text-white">
               Konfirmasi Barang Masuk
             </h2>
             <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-300">
               <p><span className="font-medium">Barang:</span> {selectedItem.name}</p>
-              <p><span className="font-medium">Jumlah:</span> {quantity} {selectedUnit.symbol} = {baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
+              <p><span className="font-medium">Jumlah:</span> {parsedQty} {selectedUnit.symbol} = {baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
               <p><span className="font-medium">Harga per {selectedUnit.symbol}:</span> {formatRp(parseFloat(price) || 0)}</p>
               <p><span className="font-medium">Total:</span> {formatRp(totalCost)}</p>
             </div>
@@ -360,7 +404,7 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
               <button
                 id="btn-confirm-stock-in"
                 type="button"
-                className="btn-primary"
+                className="btn-primary disabled:bg-slate-200 dark:disabled:bg-[#203552] disabled:text-slate-400 dark:disabled:text-[#8494ab] disabled:opacity-100"
                 onClick={handleConfirm}
                 disabled={isPending}
               >
