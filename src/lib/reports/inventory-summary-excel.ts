@@ -1,10 +1,57 @@
 import ExcelJS from 'exceljs'
-import { formatInTimeZone } from 'date-fns-tz'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
-import { createSupabaseAdmin } from '@/lib/supabase/server'
 
-const TZ = 'Asia/Jakarta'
+const INDO_MONTHS = [
+  'Januari',
+  'Februari',
+  'Maret',
+  'April',
+  'Mei',
+  'Juni',
+  'Juli',
+  'Agustus',
+  'September',
+  'Oktober',
+  'November',
+  'Desember',
+]
+
+function formatIndonesianDateStr(dateStr?: string | null): string {
+  if (!dateStr) return ''
+  const datePart = dateStr.split('T')[0]
+  if (!datePart) return dateStr
+  const parts = datePart.split('-')
+  if (parts.length !== 3) return dateStr
+  const monthIdx = parseInt(parts[1] ?? '0', 10) - 1
+  const day = parseInt(parts[2] ?? '0', 10)
+  const year = parts[0]
+  if (monthIdx >= 0 && monthIdx < 12) {
+    return `${day} ${INDO_MONTHS[monthIdx]} ${year}`
+  }
+  return dateStr
+}
+
+function formatIndonesianDateTime(d: Date): string {
+  const day = d.getDate()
+  const monthName = INDO_MONTHS[d.getMonth()]
+  const year = d.getFullYear()
+  const hours = String(d.getHours()).padStart(2, '0')
+  const mins = String(d.getMinutes()).padStart(2, '0')
+  return `${day} ${monthName} ${year}, ${hours}.${mins} WIB`
+}
+
+/**
+ * Utility: Sanitizes user-input strings to prevent formula injection in Excel.
+ */
+export function sanitizeUserString(val: string | null | undefined): string {
+  if (!val) return ''
+  const trimmed = val.trim()
+  if (/^[=+@-]/.test(trimmed)) {
+    return `'${trimmed}`
+  }
+  return trimmed
+}
 
 export interface SummaryRowItem {
   id: string
@@ -19,6 +66,9 @@ export interface SummaryRowItem {
   mutasiJumlah: number
   saldoAkhirQty: number
   nilaiAkhir: number
+  hargaRataRataCurrent?: number | null
+  nilaiPersediaanCurrent?: number | null
+  statusPenilaian?: string
 }
 
 export interface CategorySummaryGroup {
@@ -40,55 +90,50 @@ export interface InventoryReportData {
   grandTotalNilaiAkhir: number
 }
 
-export function sanitizeUserString(val: string | null | undefined): string {
-  if (!val) return ''
-  const str = String(val)
-  if (/^[=+\-@]/.test(str)) {
-    return `'${str}`
-  }
-  return str
-}
-
 /**
- * Compiles historical inventory summary report data for a given WIB date range.
+ * Compiles report data for "Laporan Rincian Barang Persediaan".
  */
 export async function compileInventoryReportData(
   supabase: SupabaseClient<Database>,
-  dateFromStr: string, // YYYY-MM-DD
-  dateToStr: string, // YYYY-MM-DD
+  dateFromStr: string,
+  dateToStr: string,
 ): Promise<InventoryReportData> {
   const startUtcIso = `${dateFromStr}T00:00:00+07:00`
   const endUtcIso = `${dateToStr}T23:59:59.999+07:00`
-  const nowWibStr = formatInTimeZone(new Date(), TZ, 'dd-MM-yyyy HH:mm')
+  const nowWibStr = formatIndonesianDateTime(new Date())
 
-  // Fetch app settings for institution info
-  const { data: appSettings } = await supabase
+  // 1. Fetch app_settings
+  const { data: settings } = await supabase
     .from('app_settings')
     .select('institution_name, report_header_text')
     .limit(1)
     .maybeSingle()
 
-  const institutionName = appSettings?.institution_name || 'PEMERINTAH KOTA / INSTANSI'
-  const reportHeaderText = appSettings?.report_header_text || 'BADAN PENGELOLAAN KEUANGAN DAN ASET DAERAH'
+  const institutionName = settings?.institution_name
+    ? settings.institution_name.trim().toUpperCase()
+    : 'NAMA INSTANSI BELUM DIATUR'
+  const reportHeaderText = settings?.report_header_text
+    ? settings.report_header_text.trim()
+    : 'LAPORAN RINCIAN BARANG PERSEDIAAN'
 
-  // Fetch all categories
+  // 2. Fetch categories
   const { data: categoriesData } = await supabase
     .from('categories')
     .select('id, name')
     .order('name', { ascending: true })
 
-  // Fetch all items created on or before endUtcIso
+  const categoryList = categoriesData || []
+
+  // 3. Fetch items with base units & category
   const { data: itemsData } = await supabase
     .from('items')
-    .select('id, sku, name, category_id, is_active, created_at, base_unit:units!base_unit_id(name, symbol)')
-    .lte('created_at', endUtcIso)
+    .select('id, sku, name, current_stock, is_active, category_id, base_unit_id, base_unit:units!base_unit_id(name, symbol), categories!category_id(name)')
     .order('sku', { ascending: true })
 
   const items = itemsData || []
-  const categoryList = categoriesData || []
 
-  // Fetch stock transactions up to endUtcIso
-  const adminSupabase = createSupabaseAdmin()
+  // 4. Fetch stock transactions up to endUtcIso
+  const adminSupabase = supabase
   const { data: transactionsData } = await supabase
     .from('stock_transactions')
     .select('id, item_id, transaction_type, input_quantity, base_quantity, quantity_delta, stock_before, stock_after, transaction_at, is_reversed, original_transaction_id')
@@ -97,23 +142,45 @@ export async function compileInventoryReportData(
 
   const allTransactions = transactionsData || []
 
-  // Try fetching transaction costs from private schema via admin client
-  const costMap: Record<string, { inventory_value_after: number }> = {}
-  try {
-    const { data: costsData } = await adminSupabase
-      .schema('private')
-      .from('stock_transaction_costs')
-      .select('transaction_id, inventory_value_after')
-
-    if (costsData) {
-      for (const c of costsData) {
-        costMap[c.transaction_id] = {
-          inventory_value_after: parseFloat(c.inventory_value_after || '0'),
-        }
+  // 5. Fetch transaction cost snapshots via get_stock_transaction_costs RPC
+  const txCostMap: Record<string, { inventory_value_after: number }> = {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: costsData, error: costsErr } = await (adminSupabase as any).rpc('get_stock_transaction_costs')
+  if (costsErr) {
+    if (costsErr.code === 'PGRST202' || costsErr.message?.includes('Could not find the function')) {
+      throw new Error(
+        'Migration 008_get_stock_transaction_costs_rpc.sql belum diterapkan. Data harga historis belum dapat diverifikasi.',
+      )
+    }
+    throw new Error(`Gagal mengambil data harga historis: ${costsErr.message}`)
+  }
+  if (costsData && Array.isArray(costsData)) {
+    for (const c of costsData) {
+      txCostMap[c.transaction_id] = {
+        inventory_value_after: parseFloat(String(c.inventory_value_after || '0')),
       }
     }
-  } catch {
-    // If private schema query is not available, fallback to 0 or estimates
+  }
+
+  // 6. Fetch current item costs via get_item_costs RPC
+  const itemCostMap: Record<string, { average_cost: number; inventory_value: number }> = {}
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: itemCostsData, error: itemCostsErr } = await (adminSupabase as any).rpc('get_item_costs')
+  if (itemCostsErr) {
+    if (itemCostsErr.code === 'PGRST202' || itemCostsErr.message?.includes('Could not find the function')) {
+      throw new Error(
+        'Migration 008_get_stock_transaction_costs_rpc.sql belum diterapkan. Data harga historis belum dapat diverifikasi.',
+      )
+    }
+    throw new Error(`Gagal mengambil data harga rata-rata persediaan: ${itemCostsErr.message}`)
+  }
+  if (itemCostsData && Array.isArray(itemCostsData)) {
+    for (const ic of itemCostsData) {
+      itemCostMap[ic.item_id] = {
+        average_cost: parseFloat(String(ic.average_cost || '0')),
+        inventory_value: parseFloat(String(ic.inventory_value || '0')),
+      }
+    }
   }
 
   // Group transactions by item_id
@@ -144,7 +211,7 @@ export async function compileInventoryReportData(
       const lastTxBefore = txsBefore[txsBefore.length - 1]
       if (lastTxBefore) {
         saldoAwalQty = Number(lastTxBefore.stock_after ?? 0)
-        nilaiAwal = costMap[lastTxBefore.id]?.inventory_value_after ?? 0
+        nilaiAwal = txCostMap[lastTxBefore.id]?.inventory_value_after ?? 0
       }
     }
 
@@ -161,7 +228,6 @@ export async function compileInventoryReportData(
       } else if (type === 'OUT' || type === 'ADJUSTMENT_OUT') {
         mutasiKeluar += qty
       } else if (type === 'REVERSAL') {
-        // Reversal delta determines direction
         if (Number(tx.quantity_delta) > 0) {
           mutasiMasuk += qty
         } else {
@@ -178,8 +244,25 @@ export async function compileInventoryReportData(
     if (txs.length > 0) {
       const lastTxAll = txs[txs.length - 1]
       if (lastTxAll) {
-        nilaiAkhir = costMap[lastTxAll.id]?.inventory_value_after ?? 0
+        nilaiAkhir = txCostMap[lastTxAll.id]?.inventory_value_after ?? 0
       }
+    }
+
+    // Determine current Valuation Status
+    const curStock = Number(item.current_stock ?? saldoAkhirQty)
+    const ic = itemCostMap[item.id]
+    let statusPenilaian = 'Normal'
+    let hargaRataRataCurrent: number | null = ic?.average_cost ?? null
+    let nilaiPersediaanCurrent: number | null = ic?.inventory_value ?? nilaiAkhir
+
+    if (curStock === 0) {
+      statusPenilaian = 'Stok Habis'
+      hargaRataRataCurrent = 0
+      nilaiPersediaanCurrent = 0
+    } else if (!ic) {
+      statusPenilaian = 'Penilaian Belum Tersedia'
+      hargaRataRataCurrent = null
+      nilaiPersediaanCurrent = null
     }
 
     // Include item if active OR has non-zero balances/mutations
@@ -187,15 +270,17 @@ export async function compileInventoryReportData(
       saldoAwalQty !== 0 ||
       mutasiMasuk !== 0 ||
       mutasiKeluar !== 0 ||
-      saldoAkhirQty !== 0
+      saldoAkhirQty !== 0 ||
+      curStock !== 0
 
     if (item.is_active || hasActivity) {
       const baseUnitObj = item.base_unit as { name?: string; symbol?: string } | null
+      const catObj = item.categories as { name?: string } | null
       itemSummaries.push({
         id: item.id,
         sku: item.sku,
         name: item.name,
-        categoryName: baseUnitObj?.name || 'Lainnya',
+        categoryName: catObj?.name || 'Lainnya',
         baseUnitSymbol: baseUnitObj?.symbol || 'pcs',
         saldoAwalQty,
         nilaiAwal: Math.max(0, nilaiAwal),
@@ -204,6 +289,9 @@ export async function compileInventoryReportData(
         mutasiJumlah,
         saldoAkhirQty,
         nilaiAkhir: Math.max(0, nilaiAkhir),
+        hargaRataRataCurrent,
+        nilaiPersediaanCurrent,
+        statusPenilaian,
       })
     }
   }
@@ -252,7 +340,6 @@ export async function compileInventoryReportData(
   for (const catId of Object.keys(catMap)) {
     const group = catMap[catId]
     if (group && group.items.length > 0) {
-      // Sort items by SKU
       group.items.sort((a, b) => a.sku.localeCompare(b.sku))
       categoryGroups.push(group)
       grandTotalNilaiAwal += group.subtotalNilaiAwal
@@ -273,7 +360,7 @@ export async function compileInventoryReportData(
 }
 
 /**
- * Builds the Excel Workbook for "Laporan Rincian Barang Persediaan" (Gambar Referensi 2).
+ * Builds the Excel Workbook for "Laporan Rincian Barang Persediaan".
  */
 export async function buildInventoryReportWorkbook(
   reportData: InventoryReportData
@@ -282,308 +369,242 @@ export async function buildInventoryReportWorkbook(
   workbook.creator = 'InventarisBarang'
   workbook.created = new Date()
 
-  const ws = workbook.addWorksheet('Rincian Persediaan', {
-    views: [{ state: 'frozen', ySplit: 8 }],
+  const worksheet = workbook.addWorksheet('Rincian Persediaan', {
+    views: [{ state: 'frozen', ySplit: 7 }],
   })
 
-  // Explicit column widths: A=18, B=45, C-I=16
-  ws.columns = [
-    { key: 'colA', width: 18 },
-    { key: 'colB', width: 45 },
-    { key: 'colC', width: 16 },
-    { key: 'colD', width: 18 },
-    { key: 'colE', width: 16 },
-    { key: 'colF', width: 16 },
-    { key: 'colG', width: 16 },
-    { key: 'colH', width: 16 },
-    { key: 'colI', width: 18 },
+  worksheet.pageSetup = {
+    orientation: 'landscape',
+    paperSize: 9, // A4
+    fitToPage: true,
+    fitToWidth: 1,
+    fitToHeight: 0,
+  }
+
+  worksheet.columns = [
+    { width: 6 },  // A: No.
+    { width: 14 }, // B: Kode Barang (SKU)
+    { width: 34 }, // C: Nama Barang
+    { width: 18 }, // D: Satuan
+    { width: 16 }, // E: Saldo Awal Qty
+    { width: 22 }, // F: Saldo Awal Rp
+    { width: 16 }, // G: Mutasi Masuk Qty
+    { width: 16 }, // H: Mutasi Keluar Qty
+    { width: 18 }, // I: Saldo Akhir Qty
+    { width: 22 }, // J: Harga Rata-Rata Persediaan Saat Ini
+    { width: 24 }, // K: Nilai Persediaan Saat Ini
+    { width: 22 }, // L: Status Penilaian
   ]
 
-  // Format dates for headers
-  const dateFromParts = reportData.dateFromWib.split('-')
-  const dateToParts = reportData.dateToWib.split('-')
-  const formattedDateFrom = `${dateFromParts[2]}-${dateFromParts[1]}-${dateFromParts[0]}`
-  const formattedDateTo = `${dateToParts[2]}-${dateToParts[1]}-${dateToParts[0]}`
-  const yearTo = dateToParts[0]
-
-  // ── Header Section (Rows 1-5) ─────────────────────────────────────────────
-  ws.mergeCells('A1:I1')
-  const row1 = ws.getRow(1)
-  row1.getCell(1).value = sanitizeUserString(reportData.reportHeaderText)
-  row1.getCell(1).font = { name: 'Arial', size: 10, bold: true }
-  row1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
-  row1.height = 20
-
-  ws.mergeCells('A2:I2')
-  const row2 = ws.getRow(2)
-  row2.getCell(1).value = 'LAPORAN RINCIAN BARANG PERSEDIAAN'
-  row2.getCell(1).font = { name: 'Arial', size: 14, bold: true }
-  row2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
-  row2.height = 24
-
-  ws.mergeCells('A3:I3')
-  const row3 = ws.getRow(3)
-  row3.getCell(1).value = `UNTUK PERIODE YANG BERAKHIR TANGGAL ${formattedDateTo}`
-  row3.getCell(1).font = { name: 'Arial', size: 10, bold: true }
-  row3.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
-  row3.height = 18
-
-  ws.mergeCells('A4:I4')
-  const row4 = ws.getRow(4)
-  row4.getCell(1).value = `TAHUN ANGGARAN : ${yearTo}`
-  row4.getCell(1).font = { name: 'Arial', size: 10, bold: true }
-  row4.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
-  row4.height = 18
-
-  ws.mergeCells('A5:I5')
-  const row5 = ws.getRow(5)
-  row5.getCell(1).value = `${sanitizeUserString(reportData.institutionName)} · Waktu Pembuatan: ${reportData.generatedAtWib} WIB`
-  row5.getCell(1).font = { name: 'Arial', size: 9, italic: true, color: { argb: 'FF4B5563' } }
-  row5.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
-  row5.height = 18
-
-  ws.getRow(6).height = 10 // Empty spacer row
-
-  // ── Table Headers (Rows 7-8) ───────────────────────────────────────────────
-  // Row 7
-  ws.mergeCells('A7:B8')
-  ws.getCell('A7').value = 'KODE & URAIAN'
-  
-  ws.mergeCells('C7:D7')
-  ws.getCell('C7').value = `NILAI S/D ${formattedDateFrom}`
-
-  ws.mergeCells('E7:G7')
-  ws.getCell('E7').value = 'MUTASI'
-
-  ws.mergeCells('H7:I7')
-  ws.getCell('H7').value = `NILAI S/D ${formattedDateTo}`
-
-  // Row 8
-  ws.getCell('C8').value = 'JUMLAH'
-  ws.getCell('D8').value = 'RUPIAH'
-  ws.getCell('E8').value = 'MASUK'
-  ws.getCell('F8').value = 'KELUAR'
-  ws.getCell('G8').value = 'JUMLAH'
-  ws.getCell('H8').value = 'JUMLAH'
-  ws.getCell('I8').value = 'RUPIAH'
-
-  // Style header cells (Rows 7 & 8)
-  const headerStyle = {
-    font: { name: 'Arial', size: 10, bold: true, color: { argb: 'FF1F2937' } },
-    fill: {
-      type: 'pattern' as const,
-      pattern: 'solid' as const,
-      fgColor: { argb: 'FFE5E7EB' }, // Light gray
-    },
-    alignment: { horizontal: 'center' as const, vertical: 'middle' as const, wrapText: true },
-    border: {
-      top: { style: 'thin' as const, color: { argb: 'FF9CA3AF' } },
-      bottom: { style: 'thin' as const, color: { argb: 'FF9CA3AF' } },
-      left: { style: 'thin' as const, color: { argb: 'FF9CA3AF' } },
-      right: { style: 'thin' as const, color: { argb: 'FF9CA3AF' } },
-    },
-  }
-
-  for (let r = 7; r <= 8; r++) {
-    const row = ws.getRow(r)
-    row.height = 22
-    for (let c = 1; c <= 9; c++) {
-      const cell = row.getCell(c)
-      cell.font = headerStyle.font
-      cell.fill = headerStyle.fill
-      cell.alignment = headerStyle.alignment
-      cell.border = headerStyle.border
-    }
-  }
-
-  // Correct text for A7 after merge
-  ws.getCell('A7').value = 'KODE & NAMA BARANG'
-
-  // ── Data Rows (Category Headers, Items, Subtotals) ─────────────────────────
-  let currentRowIdx = 9
-
   const thinBorder = {
-    top: { style: 'thin' as const, color: { argb: 'FFE5E7EB' } },
-    bottom: { style: 'thin' as const, color: { argb: 'FFE5E7EB' } },
-    left: { style: 'thin' as const, color: { argb: 'FFE5E7EB' } },
-    right: { style: 'thin' as const, color: { argb: 'FFE5E7EB' } },
+    top: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
+    bottom: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
+    left: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
+    right: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
   }
+
+  const currencyFormat = '"Rp"#,##0;[Red]("-Rp"#,##0);"-"'
+
+  // Header Title Block (Rows 1-4)
+  worksheet.mergeCells('A1:L1')
+  const r1 = worksheet.getRow(1)
+  r1.getCell(1).value = reportData.institutionName
+  r1.getCell(1).font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FF1E293B' } }
+  r1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
+  r1.height = 28
+
+  worksheet.mergeCells('A2:L2')
+  const r2 = worksheet.getRow(2)
+  r2.getCell(1).value = reportData.reportHeaderText
+  r2.getCell(1).font = { name: 'Calibri', size: 13, bold: true, color: { argb: 'FF334155' } }
+  r2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
+  r2.height = 22
+
+  worksheet.mergeCells('A3:L3')
+  const r3 = worksheet.getRow(3)
+  r3.getCell(1).value = `Periode: ${formatIndonesianDateStr(reportData.dateFromWib)} s/d ${formatIndonesianDateStr(reportData.dateToWib)}`
+  r3.getCell(1).font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF475569' } }
+  r3.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
+  r3.height = 18
+
+  worksheet.mergeCells('A4:L4')
+  const r4 = worksheet.getRow(4)
+  r4.getCell(1).value = `Dibuat pada: ${reportData.generatedAtWib}`
+  r4.getCell(1).font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF64748B' } }
+  r4.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
+  r4.height = 18
+
+  worksheet.getRow(5).height = 10
+
+  // Table Headers (Row 6)
+  const hRow = worksheet.getRow(6)
+  hRow.height = 26
+  const headers = [
+    'No.',
+    'Kode Barang (SKU)',
+    'Nama Barang',
+    'Satuan',
+    'Saldo Awal (Qty)',
+    'Saldo Awal (Rp)',
+    'Mutasi Masuk (Qty)',
+    'Mutasi Keluar (Qty)',
+    'Saldo Akhir (Qty)',
+    'Harga Rata-Rata Persediaan',
+    'Nilai Persediaan Saat Ini',
+    'Status Penilaian',
+  ]
+
+  for (let c = 1; c <= 12; c++) {
+    const cell = hRow.getCell(c)
+    cell.value = headers[c - 1]
+    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } }
+    cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+    cell.border = thinBorder
+  }
+
+  let rowIdx = 7
+  let globalItemNumber = 1
 
   for (const catGroup of reportData.categories) {
     // Category Header Row
-    ws.mergeCells(`A${currentRowIdx}:C${currentRowIdx}`)
-    const catRow = ws.getRow(currentRowIdx)
+    worksheet.mergeCells(`A${rowIdx}:L${rowIdx}`)
+    const catRow = worksheet.getRow(rowIdx)
     catRow.height = 22
-    catRow.getCell(1).value = `KATEGORI: ${sanitizeUserString(catGroup.categoryName).toUpperCase()}`
-    catRow.getCell(1).font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF1F2937' } }
-    catRow.getCell(1).alignment = { horizontal: 'left', vertical: 'middle' }
-
-    // Category Subtotal Nilai Awal in Col D
-    const cellSubAwal = catRow.getCell(4)
-    cellSubAwal.value = Number(catGroup.subtotalNilaiAwal)
-    cellSubAwal.numFmt = '#,##0'
-    cellSubAwal.font = { name: 'Arial', size: 10, bold: true }
-    cellSubAwal.alignment = { horizontal: 'right', vertical: 'middle' }
-
-    // Category Subtotal Nilai Akhir in Col I
-    const cellSubAkhir = catRow.getCell(9)
-    cellSubAkhir.value = Number(catGroup.subtotalNilaiAkhir)
-    cellSubAkhir.numFmt = '#,##0'
-    cellSubAkhir.font = { name: 'Arial', size: 10, bold: true }
-    cellSubAkhir.alignment = { horizontal: 'right', vertical: 'middle' }
-
-    // Apply background & borders to category row
-    for (let c = 1; c <= 9; c++) {
-      const cell = catRow.getCell(c)
-      cell.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FFF3F4F6' },
-      }
-      cell.border = {
-        top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
-        bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
-        left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
-        right: { style: 'thin', color: { argb: 'FFD1D5DB' } },
-      }
+    const catCell = catRow.getCell(1)
+    catCell.value = `KATEGORI: ${catGroup.categoryName.toUpperCase()}`
+    catCell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FFFFFFFF' } }
+    catCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } }
+    catCell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 }
+    for (let c = 1; c <= 12; c++) {
+      catRow.getCell(c).border = thinBorder
     }
+    rowIdx++
 
-    currentRowIdx++
-
-    // Items under Category
+    // Data Rows
     for (const item of catGroup.items) {
-      const row = ws.getRow(currentRowIdx)
+      const row = worksheet.getRow(rowIdx)
       row.height = 20
 
-      // Col A: KODE (String)
-      const cellA = row.getCell(1)
-      cellA.value = item.sku
-      cellA.numFmt = '@'
-      cellA.font = { name: 'Arial', size: 9.5 }
-      cellA.alignment = { horizontal: 'left', vertical: 'middle' }
+      const isEven = rowIdx % 2 === 0
+      const rowBg = isEven ? 'FFF8FAFC' : 'FFFFFFFF'
 
-      // Col B: URAIAN (String)
-      const cellB = row.getCell(2)
-      cellB.value = sanitizeUserString(item.name)
-      cellB.font = { name: 'Arial', size: 9.5 }
-      cellB.alignment = { horizontal: 'left', vertical: 'middle' }
+      row.getCell(1).value = globalItemNumber++
+      row.getCell(2).value = item.sku
+      row.getCell(3).value = sanitizeUserString(item.name)
+      row.getCell(4).value = item.baseUnitSymbol
 
-      // Col C: Saldo Awal JUMLAH (Number)
-      const cellC = row.getCell(3)
-      cellC.value = Number(item.saldoAwalQty)
-      cellC.numFmt = '#,##0'
-      cellC.font = { name: 'Arial', size: 9.5 }
-      cellC.alignment = { horizontal: 'right', vertical: 'middle' }
+      row.getCell(5).value = item.saldoAwalQty
+      row.getCell(5).numFmt = '#,##0'
 
-      // Col D: Saldo Awal RUPIAH (Number)
-      const cellD = row.getCell(4)
-      cellD.value = Number(item.nilaiAwal)
-      cellD.numFmt = '#,##0'
-      cellD.font = { name: 'Arial', size: 9.5 }
-      cellD.alignment = { horizontal: 'right', vertical: 'middle' }
+      row.getCell(6).value = item.nilaiAwal
+      row.getCell(6).numFmt = currencyFormat
 
-      // Col E: Mutasi MASUK (Number)
-      const cellE = row.getCell(5)
-      cellE.value = Number(item.mutasiMasuk)
-      cellE.numFmt = '#,##0'
-      cellE.font = { name: 'Arial', size: 9.5 }
-      cellE.alignment = { horizontal: 'right', vertical: 'middle' }
+      row.getCell(7).value = item.mutasiMasuk
+      row.getCell(7).numFmt = '#,##0'
 
-      // Col F: Mutasi KELUAR (Number)
-      const cellF = row.getCell(6)
-      cellF.value = Number(item.mutasiKeluar)
-      cellF.numFmt = '#,##0'
-      cellF.font = { name: 'Arial', size: 9.5 }
-      cellF.alignment = { horizontal: 'right', vertical: 'middle' }
+      row.getCell(8).value = item.mutasiKeluar
+      row.getCell(8).numFmt = '#,##0'
 
-      // Col G: Mutasi JUMLAH (Number)
-      const cellG = row.getCell(7)
-      cellG.value = Number(item.mutasiJumlah)
-      cellG.numFmt = '#,##0'
-      cellG.font = { name: 'Arial', size: 9.5 }
-      cellG.alignment = { horizontal: 'right', vertical: 'middle' }
+      row.getCell(9).value = item.saldoAkhirQty
+      row.getCell(9).numFmt = '#,##0'
 
-      // Col H: Saldo Akhir JUMLAH (Number)
-      const cellH = row.getCell(8)
-      cellH.value = Number(item.saldoAkhirQty)
-      cellH.numFmt = '#,##0'
-      cellH.font = { name: 'Arial', size: 9.5 }
-      cellH.alignment = { horizontal: 'right', vertical: 'middle' }
-
-      // Col I: Saldo Akhir RUPIAH (Number)
-      const cellI = row.getCell(9)
-      cellI.value = Number(item.nilaiAkhir)
-      cellI.numFmt = '#,##0'
-      cellI.font = { name: 'Arial', size: 9.5 }
-      cellI.alignment = { horizontal: 'right', vertical: 'middle' }
-
-      // Apply borders to item row
-      for (let c = 1; c <= 9; c++) {
-        row.getCell(c).border = thinBorder
+      // Col 10: Harga Rata-Rata Persediaan Saat Ini
+      const c10 = row.getCell(10)
+      if (item.hargaRataRataCurrent !== null && item.hargaRataRataCurrent !== undefined) {
+        c10.value = item.hargaRataRataCurrent
+        c10.numFmt = currencyFormat
+      } else {
+        c10.value = '—'
+        c10.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF94A3B8' } }
       }
 
-      currentRowIdx++
+      // Col 11: Nilai Persediaan Saat Ini
+      const c11 = row.getCell(11)
+      if (item.nilaiPersediaanCurrent !== null && item.nilaiPersediaanCurrent !== undefined) {
+        c11.value = item.nilaiPersediaanCurrent
+        c11.numFmt = currencyFormat
+      } else {
+        c11.value = '—'
+        c11.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF94A3B8' } }
+      }
+
+      // Col 12: Status Penilaian
+      const c12 = row.getCell(12)
+      c12.value = item.statusPenilaian || 'Normal'
+      if (item.statusPenilaian === 'Stok Habis') {
+        c12.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF64748B' } }
+      } else if (item.statusPenilaian === 'Penilaian Belum Tersedia') {
+        c12.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FFC2410C' } }
+      }
+
+      for (let c = 1; c <= 12; c++) {
+        const cell = row.getCell(c)
+        cell.border = thinBorder
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
+        if (!cell.font) {
+          cell.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF0F172A' } }
+        }
+
+        if ([1, 2, 4, 12].includes(c)) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' }
+        } else if ([5, 6, 7, 8, 9, 10, 11].includes(c)) {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' }
+        } else {
+          cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }
+        }
+      }
+
+      rowIdx++
     }
-  }
 
-  // ── Grand Total Row (JUMLAH TOTAL) ─────────────────────────────────────────
-  ws.mergeCells(`A${currentRowIdx}:C${currentRowIdx}`)
-  const totalRow = ws.getRow(currentRowIdx)
-  totalRow.height = 24
+    // Category Subtotal Row
+    const subRow = worksheet.getRow(rowIdx)
+    subRow.height = 22
+    subRow.getCell(3).value = `Subtotal ${catGroup.categoryName}`
+    subRow.getCell(6).value = catGroup.subtotalNilaiAwal
+    subRow.getCell(6).numFmt = currencyFormat
+    subRow.getCell(11).value = catGroup.subtotalNilaiAkhir
+    subRow.getCell(11).numFmt = currencyFormat
 
-  const cellTotalTitle = totalRow.getCell(1)
-  cellTotalTitle.value = 'JUMLAH TOTAL'
-  cellTotalTitle.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FF111827' } }
-  cellTotalTitle.alignment = { horizontal: 'left', vertical: 'middle' }
-
-  // Col D: Grand Total Nilai Awal
-  const cellGrandAwal = totalRow.getCell(4)
-  cellGrandAwal.value = Number(reportData.grandTotalNilaiAwal)
-  cellGrandAwal.numFmt = '#,##0'
-  cellGrandAwal.font = { name: 'Arial', size: 10, bold: true }
-  cellGrandAwal.alignment = { horizontal: 'right', vertical: 'middle' }
-
-  // Col I: Grand Total Nilai Akhir
-  const cellGrandAkhir = totalRow.getCell(9)
-  cellGrandAkhir.value = Number(reportData.grandTotalNilaiAkhir)
-  cellGrandAkhir.numFmt = '#,##0'
-  cellGrandAkhir.font = { name: 'Arial', size: 10, bold: true }
-  cellGrandAkhir.alignment = { horizontal: 'right', vertical: 'middle' }
-
-  // Total Row Styling
-  const totalBorder = {
-    top: { style: 'thin' as const, color: { argb: 'FF374151' } },
-    bottom: { style: 'double' as const, color: { argb: 'FF374151' } },
-    left: { style: 'thin' as const, color: { argb: 'FFD1D5DB' } },
-    right: { style: 'thin' as const, color: { argb: 'FFD1D5DB' } },
-  }
-
-  for (let c = 1; c <= 9; c++) {
-    const cell = totalRow.getCell(c)
-    cell.fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFE5E7EB' },
+    for (let c = 1; c <= 12; c++) {
+      const cell = subRow.getCell(c)
+      cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } }
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }
+      cell.border = thinBorder
+      if (c === 6 || c === 11) {
+        cell.alignment = { horizontal: 'right', vertical: 'middle' }
+      } else {
+        cell.alignment = { horizontal: 'left', vertical: 'middle' }
+      }
     }
-    cell.border = totalBorder
+    rowIdx++
   }
 
-  // ── Page Setup & Print Formatting (Section H) ──────────────────────────────
-  ws.pageSetup = {
-    paperSize: 9, // A4
-    orientation: 'landscape',
-    fitToWidth: 1,
-    fitToHeight: 0,
-    fitToPage: true,
-    margins: {
-      left: 0.5,
-      right: 0.5,
-      top: 0.75,
-      bottom: 0.75,
-      header: 0.3,
-      footer: 0.3,
-    },
-    printTitlesRow: '7:8',
+  // Grand Total Row
+  const grandRow = worksheet.getRow(rowIdx)
+  grandRow.height = 24
+  grandRow.getCell(3).value = 'TOTAL KESELURUHAN PERSEDIAAN'
+  grandRow.getCell(6).value = reportData.grandTotalNilaiAwal
+  grandRow.getCell(6).numFmt = currencyFormat
+  grandRow.getCell(11).value = reportData.grandTotalNilaiAkhir
+  grandRow.getCell(11).numFmt = currencyFormat
+
+  for (let c = 1; c <= 12; c++) {
+    const cell = grandRow.getCell(c)
+    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF0F172A' } }
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCBD5E1' } }
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'FF94A3B8' } },
+      bottom: { style: 'double', color: { argb: 'FF0F172A' } },
+      left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+      right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
+    }
+    if (c === 6 || c === 11) {
+      cell.alignment = { horizontal: 'right', vertical: 'middle' }
+    } else {
+      cell.alignment = { horizontal: 'left', vertical: 'middle' }
+    }
   }
 
   const arrayBuffer = await workbook.xlsx.writeBuffer()

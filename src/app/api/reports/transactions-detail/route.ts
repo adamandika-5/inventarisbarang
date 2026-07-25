@@ -82,9 +82,10 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (err: unknown) {
-    console.error('Error generating transaction history excel:', err)
+    const errorMsg = err instanceof Error ? err.message : 'Gagal membuat file Excel Riwayat Transaksi.'
+    console.error('[API /api/reports/transactions-detail] Error generating transaction history excel:', err)
     return NextResponse.json(
-      { error: 'Gagal membuat file Excel Riwayat Transaksi.' },
+      { error: errorMsg },
       { status: 500 }
     )
   }

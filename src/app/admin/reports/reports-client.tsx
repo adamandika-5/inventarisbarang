@@ -202,7 +202,20 @@ export default function ReportsClient({
       setDownloadError(null)
       const res = await fetch(url)
       if (!res.ok) {
-        throw new Error('Gagal mengunduh file laporan.')
+        let message = 'Gagal mengunduh file laporan.'
+        try {
+          const contentType = res.headers.get('content-type') ?? ''
+          if (contentType.includes('application/json')) {
+            const body = await res.json()
+            message = body.error || body.message || message
+          } else {
+            const body = await res.text()
+            if (body.trim()) message = body
+          }
+        } catch {
+          // Use default fallback message
+        }
+        throw new Error(message)
       }
 
       let filename = defaultFilename
@@ -224,7 +237,7 @@ export default function ReportsClient({
       a.remove()
       URL.revokeObjectURL(blobUrl)
     } catch (err: unknown) {
-      console.error(err)
+      console.error('Excel Download Error:', err)
       setDownloadError(err instanceof Error ? err.message : 'Terjadi kesalahan saat mengunduh laporan.')
     }
   }

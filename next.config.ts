@@ -1,6 +1,9 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  devIndicators: {
+    position: 'bottom-right',
+  },
   // Use Node.js runtime for routes requiring PDF/Excel generation
   experimental: {
     serverActions: {

@@ -71,9 +71,10 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (err: unknown) {
-    console.error('Error generating inventory summary report excel:', err)
+    const errorMsg = err instanceof Error ? err.message : 'Gagal membuat file Excel Laporan Rincian Persediaan.'
+    console.error('[API /api/reports/inventory-summary] Error generating inventory summary excel:', err)
     return NextResponse.json(
-      { error: 'Gagal membuat file Excel Laporan Rincian Persediaan.' },
+      { error: errorMsg },
       { status: 500 }
     )
   }

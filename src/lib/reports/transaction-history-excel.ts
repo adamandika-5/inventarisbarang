@@ -2,7 +2,6 @@ import ExcelJS from 'exceljs'
 import { formatInTimeZone } from 'date-fns-tz'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, TransactionType } from '@/types/database'
-import { createSupabaseAdmin } from '@/lib/supabase/server'
 import { sanitizeUserString } from './inventory-summary-excel'
 
 const TZ = 'Asia/Jakarta'
@@ -78,9 +77,9 @@ const TYPE_LABELS: Record<TransactionType, string> = {
 
 /**
  * Builds Excel Workbook for "Riwayat Transaksi" with 3 sheets:
- * 1. Ringkasan
- * 2. Riwayat Transaksi
- * 3. Detail Audit
+ * 1. Ringkasan (Valuasi & Rekonsiliasi Mutasi Persediaan)
+ * 2. Riwayat Transaksi (20 Kolom Laporan User-Friendly)
+ * 3. Detail Audit (20 Kolom Audit Trail Teknis)
  */
 export async function buildTransactionHistoryWorkbook(
   supabase: SupabaseClient<Database>,
@@ -91,7 +90,7 @@ export async function buildTransactionHistoryWorkbook(
   const startUtc = `${dateFromStr}T00:00:00+07:00`
   const endUtc = `${dateToStr}T23:59:59.999+07:00`
 
-  // 1. Fetch app_settings if institutionName or reportHeaderText is not supplied
+  // 1. Fetch app_settings for institution info if not supplied
   let instName = params.institutionName
   let headerText = params.reportHeaderText
 
@@ -113,12 +112,12 @@ export async function buildTransactionHistoryWorkbook(
   const generatedAtWib = formatIndonesianDateTime(new Date())
   const dateRangeDisplay = `${formatIndonesianDateStr(dateFromStr)} s/d ${formatIndonesianDateStr(dateToStr)}`
 
-  // 2. Fetch up to 10,000 transactions
+  // 2. Fetch transactions in requested date range
   const validTypes = ['IN', 'OUT', 'INITIAL', 'ADJUSTMENT_IN', 'ADJUSTMENT_OUT', 'REVERSAL']
   let query = supabase
     .from('stock_transactions')
     .select(
-      'id, transaction_number, client_request_id, item_id, transaction_type, input_quantity, base_quantity, conversion_factor_snapshot, quantity_delta, performed_by, transaction_at, stock_before, stock_after, reason, original_transaction_id, is_reversed, reversal_transaction_id, items!item_id(id, sku, name), units!unit_id(id, name, symbol), profiles!performed_by(id, full_name, username)',
+      'id, transaction_number, client_request_id, item_id, transaction_type, input_quantity, base_quantity, conversion_factor_snapshot, quantity_delta, performed_by, transaction_at, stock_before, stock_after, reason, original_transaction_id, is_reversed, reversal_transaction_id, items!item_id(id, sku, name, category_id, categories!category_id(name)), units!unit_id(id, name, symbol), profiles!performed_by(id, full_name, username)',
     )
     .gte('transaction_at', startUtc)
     .lte('transaction_at', endUtc)
@@ -158,55 +157,112 @@ export async function buildTransactionHistoryWorkbook(
     }
   }
 
-  // 3. Fetch historical cost snapshots from private.stock_transaction_costs via admin client
+  // 3. Fetch historical cost snapshots via RPC get_stock_transaction_costs
   const costMap: Record<
     string,
     {
+      unit_price_input: number | null
       base_unit_cost: number | null
-      transaction_value: number | null
+      average_cost_before: number | null
+      average_cost_after: number | null
       inventory_value_before: number | null
+      inventory_value_change: number | null
       inventory_value_after: number | null
+      transaction_value: number | null
       has_cost: boolean
     }
   > = {}
 
   if (txIds.length > 0) {
-    try {
-      const adminSupabase = createSupabaseAdmin()
-      const { data: costsData } = await adminSupabase
-        .schema('private')
-        .from('stock_transaction_costs')
-        .select('transaction_id, base_unit_cost, transaction_value, inventory_value_before, inventory_value_after')
-        .in('transaction_id', txIds)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: costsData, error: rpcErr } = await (supabase as any).rpc('get_stock_transaction_costs', {
+      p_transaction_ids: txIds,
+    })
 
-      if (costsData) {
-        for (const c of costsData) {
-          const costVal =
-            c.base_unit_cost !== null && c.base_unit_cost !== undefined ? parseFloat(c.base_unit_cost) : null
-          const txVal =
-            c.transaction_value !== null && c.transaction_value !== undefined
-              ? parseFloat(c.transaction_value)
-              : null
-          costMap[c.transaction_id] = {
-            base_unit_cost: costVal,
-            transaction_value: txVal,
-            inventory_value_before: c.inventory_value_before !== null ? parseFloat(c.inventory_value_before) : null,
-            inventory_value_after: c.inventory_value_after !== null ? parseFloat(c.inventory_value_after) : null,
-            has_cost: costVal !== null && !isNaN(costVal),
-          }
+    if (rpcErr) {
+      if (rpcErr.code === 'PGRST202' || rpcErr.message?.includes('Could not find the function')) {
+        throw new Error(
+          'Migration 008_get_stock_transaction_costs_rpc.sql belum diterapkan. Data harga historis belum dapat diverifikasi.',
+        )
+      }
+      throw new Error(`Gagal mengambil data harga historis: ${rpcErr.message}`)
+    }
+
+    if (costsData && Array.isArray(costsData)) {
+      for (const c of costsData) {
+        const costVal =
+          c.base_unit_cost !== null && c.base_unit_cost !== undefined ? parseFloat(String(c.base_unit_cost)) : null
+        const txVal =
+          c.transaction_value !== null && c.transaction_value !== undefined
+            ? parseFloat(String(c.transaction_value))
+            : null
+        const unitPriceInputVal =
+          c.unit_price_input !== null && c.unit_price_input !== undefined
+            ? parseFloat(String(c.unit_price_input))
+            : null
+
+        costMap[c.transaction_id] = {
+          unit_price_input: unitPriceInputVal,
+          base_unit_cost: costVal,
+          average_cost_before:
+            c.average_cost_before !== null && c.average_cost_before !== undefined
+              ? parseFloat(String(c.average_cost_before))
+              : null,
+          average_cost_after:
+            c.average_cost_after !== null && c.average_cost_after !== undefined
+              ? parseFloat(String(c.average_cost_after))
+              : null,
+          inventory_value_before:
+            c.inventory_value_before !== null && c.inventory_value_before !== undefined
+              ? parseFloat(String(c.inventory_value_before))
+              : null,
+          inventory_value_change:
+            c.inventory_value_change !== null && c.inventory_value_change !== undefined
+              ? parseFloat(String(c.inventory_value_change))
+              : null,
+          inventory_value_after:
+            c.inventory_value_after !== null && c.inventory_value_after !== undefined
+              ? parseFloat(String(c.inventory_value_after))
+              : null,
+          transaction_value: txVal,
+          has_cost: costVal !== null && !isNaN(costVal),
         }
       }
-    } catch {
-      // If private schema is unavailable, fallback gracefully
     }
   }
 
-  // 4. Calculate summary metrics
-  let totalStokMasuk = 0
-  let totalStokKeluar = 0
-  let perubahanStokBersih = 0
-  let nilaiMutasiMasuk = 0
-  let nilaiMutasiKeluar = 0
+  // 4. Fetch transactions before startUtc to calculate historical initial inventory value
+  let nilaiStokAwal = 0
+  const { data: priorTx } = await supabase
+    .from('stock_transactions')
+    .select('id, transaction_at')
+    .lt('transaction_at', startUtc)
+    .order('transaction_at', { ascending: false })
+    .limit(1)
+
+  if (priorTx && priorTx.length > 0 && priorTx[0]?.id) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: priorCost } = await (supabase as any).rpc('get_stock_transaction_costs', {
+      p_transaction_ids: [priorTx[0].id],
+    })
+    if (priorCost && Array.isArray(priorCost) && priorCost.length > 0 && priorCost[0]?.inventory_value_after) {
+      nilaiStokAwal = parseFloat(String(priorCost[0].inventory_value_after))
+    }
+  }
+
+  // 5. Calculate summary metrics & reconciliation values
+  let totalMutasiMasukQty = 0
+  let totalMutasiKeluarQty = 0
+  let netMutasiQty = 0
+
+  let mutasiMasukInVal = 0
+  let mutasiMasukAdjVal = 0
+  let mutasiMasukRevVal = 0
+
+  let mutasiKeluarOutVal = 0
+  let mutasiKeluarAdjVal = 0
+  let mutasiKeluarRevVal = 0
+
   let pricedCount = 0
   let unpricedCount = 0
 
@@ -214,35 +270,29 @@ export async function buildTransactionHistoryWorkbook(
     TransactionType,
     {
       count: number
-      stokMasuk: number
-      stokKeluar: number
-      perubahanBersih: number
-      nilaiMutasi: number
+      masukQty: number
+      masukVal: number
+      keluarQty: number
+      keluarVal: number
+      netQty: number
+      netVal: number
       pricedCount: number
     }
   > = {
-    INITIAL: { count: 0, stokMasuk: 0, stokKeluar: 0, perubahanBersih: 0, nilaiMutasi: 0, pricedCount: 0 },
-    IN: { count: 0, stokMasuk: 0, stokKeluar: 0, perubahanBersih: 0, nilaiMutasi: 0, pricedCount: 0 },
-    OUT: { count: 0, stokMasuk: 0, stokKeluar: 0, perubahanBersih: 0, nilaiMutasi: 0, pricedCount: 0 },
-    ADJUSTMENT_IN: { count: 0, stokMasuk: 0, stokKeluar: 0, perubahanBersih: 0, nilaiMutasi: 0, pricedCount: 0 },
-    ADJUSTMENT_OUT: { count: 0, stokMasuk: 0, stokKeluar: 0, perubahanBersih: 0, nilaiMutasi: 0, pricedCount: 0 },
-    REVERSAL: { count: 0, stokMasuk: 0, stokKeluar: 0, perubahanBersih: 0, nilaiMutasi: 0, pricedCount: 0 },
+    INITIAL: { count: 0, masukQty: 0, masukVal: 0, keluarQty: 0, keluarVal: 0, netQty: 0, netVal: 0, pricedCount: 0 },
+    IN: { count: 0, masukQty: 0, masukVal: 0, keluarQty: 0, keluarVal: 0, netQty: 0, netVal: 0, pricedCount: 0 },
+    OUT: { count: 0, masukQty: 0, masukVal: 0, keluarQty: 0, keluarVal: 0, netQty: 0, netVal: 0, pricedCount: 0 },
+    ADJUSTMENT_IN: { count: 0, masukQty: 0, masukVal: 0, keluarQty: 0, keluarVal: 0, netQty: 0, netVal: 0, pricedCount: 0 },
+    ADJUSTMENT_OUT: { count: 0, masukQty: 0, masukVal: 0, keluarQty: 0, keluarVal: 0, netQty: 0, netVal: 0, pricedCount: 0 },
+    REVERSAL: { count: 0, masukQty: 0, masukVal: 0, keluarQty: 0, keluarVal: 0, netQty: 0, netVal: 0, pricedCount: 0 },
   }
 
   for (const tx of txList) {
+    if (!tx) continue
     const delta = Number(tx.quantity_delta ?? 0)
     const cost = costMap[tx.id]
     const hasCost = cost?.has_cost ?? false
-    const txVal = cost?.transaction_value ?? 0
-
-    if (delta > 0) {
-      totalStokMasuk += delta
-      if (hasCost) nilaiMutasiMasuk += txVal
-    } else if (delta < 0) {
-      totalStokKeluar += Math.abs(delta)
-      if (hasCost) nilaiMutasiKeluar += Math.abs(txVal)
-    }
-    perubahanStokBersih += delta
+    const txVal = Math.abs(cost?.transaction_value ?? 0)
 
     if (hasCost) {
       pricedCount++
@@ -253,17 +303,60 @@ export async function buildTransactionHistoryWorkbook(
     const typeGroup = rekapMap[tx.transaction_type]
     if (typeGroup) {
       typeGroup.count++
-      if (delta > 0) typeGroup.stokMasuk += delta
-      if (delta < 0) typeGroup.stokKeluar += Math.abs(delta)
-      typeGroup.perubahanBersih += delta
+      if (delta > 0) {
+        typeGroup.masukQty += delta
+        if (hasCost) typeGroup.masukVal += txVal
+      } else if (delta < 0) {
+        typeGroup.keluarQty += Math.abs(delta)
+        if (hasCost) typeGroup.keluarVal += txVal
+      }
+      typeGroup.netQty += delta
       if (hasCost) {
-        typeGroup.nilaiMutasi += txVal
+        typeGroup.netVal += cost?.inventory_value_change ?? 0
         typeGroup.pricedCount++
       }
     }
+
+    if (delta > 0) {
+      totalMutasiMasukQty += delta
+      if (hasCost) {
+        if (tx.transaction_type === 'IN' || tx.transaction_type === 'INITIAL') {
+          mutasiMasukInVal += txVal
+        } else if (tx.transaction_type === 'ADJUSTMENT_IN') {
+          mutasiMasukAdjVal += txVal
+        } else if (tx.transaction_type === 'REVERSAL') {
+          mutasiMasukRevVal += txVal
+        }
+      }
+    } else if (delta < 0) {
+      totalMutasiKeluarQty += Math.abs(delta)
+      if (hasCost) {
+        if (tx.transaction_type === 'OUT') {
+          mutasiKeluarOutVal += txVal
+        } else if (tx.transaction_type === 'ADJUSTMENT_OUT') {
+          mutasiKeluarAdjVal += txVal
+        } else if (tx.transaction_type === 'REVERSAL') {
+          mutasiKeluarRevVal += txVal
+        }
+      }
+    }
+    netMutasiQty += delta
   }
 
-  const selisihNilaiMutasi = nilaiMutasiMasuk - nilaiMutasiKeluar
+  const totalMutasiMasukVal = mutasiMasukInVal + mutasiMasukAdjVal + mutasiMasukRevVal
+  const totalMutasiKeluarVal = mutasiKeluarOutVal + mutasiKeluarAdjVal + mutasiKeluarRevVal
+
+  // Determine Nilai Stok Akhir from last transaction in period
+  let nilaiStokAkhir = 0
+  const latestTx = txList[0] // Sorted descending by transaction_at
+  if (latestTx && costMap[latestTx.id]?.inventory_value_after !== null && costMap[latestTx.id]?.inventory_value_after !== undefined) {
+    nilaiStokAkhir = costMap[latestTx.id]!.inventory_value_after!
+  } else if (nilaiStokAwal > 0 || totalMutasiMasukVal > 0 || totalMutasiKeluarVal > 0) {
+    nilaiStokAkhir = nilaiStokAwal + totalMutasiMasukVal - totalMutasiKeluarVal
+  }
+
+  const selisihRekonsiliasi = nilaiStokAwal + totalMutasiMasukVal - totalMutasiKeluarVal - nilaiStokAkhir
+  const statusRekonsiliasi = Math.abs(selisihRekonsiliasi) < 0.01 ? 'SEIMBANG' : 'TIDAK SEIMBANG'
   const totalTransactions = txList.length
   const allUnpriced = totalTransactions > 0 && pricedCount === 0
 
@@ -272,7 +365,6 @@ export async function buildTransactionHistoryWorkbook(
   workbook.creator = 'InventarisBarang'
   workbook.created = new Date()
 
-  // Common border definitions
   const thinBorder = {
     top: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
     bottom: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
@@ -296,37 +388,39 @@ export async function buildTransactionHistoryWorkbook(
   }
 
   wsRingkasan.columns = [
-    { width: 34 }, // A: Metrik / Jenis Transaksi
-    { width: 22 }, // B: Nilai / Jumlah Transaksi
-    { width: 22 }, // C: Total Kuantitas Masuk
-    { width: 22 }, // D: Total Kuantitas Keluar
-    { width: 20 }, // E: Perubahan Bersih
-    { width: 26 }, // F: Nilai Mutasi
+    { width: 38 }, // A: Component Label
+    { width: 26 }, // B: Valuasi Rupiah / Kuantitas
+    { width: 20 }, // C: Total Kuantitas Masuk
+    { width: 20 }, // D: Total Kuantitas Keluar
+    { width: 20 }, // E: Net Mutasi Kuantitas
+    { width: 26 }, // F: Nilai Mutasi Persediaan
+    { width: 26 }, // G: Status
+    { width: 26 }, // H: Catatan
   ]
 
   // Header Title (Rows 1-4)
-  wsRingkasan.mergeCells('A1:F1')
+  wsRingkasan.mergeCells('A1:H1')
   const r11 = wsRingkasan.getRow(1)
   r11.getCell(1).value = instNameDisplay
   r11.getCell(1).font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FF1E293B' } }
   r11.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
   r11.height = 28
 
-  wsRingkasan.mergeCells('A2:F2')
+  wsRingkasan.mergeCells('A2:H2')
   const r12 = wsRingkasan.getRow(2)
   r12.getCell(1).value = headerTextDisplay
   r12.getCell(1).font = { name: 'Calibri', size: 13, bold: true, color: { argb: 'FF334155' } }
   r12.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
   r12.height = 22
 
-  wsRingkasan.mergeCells('A3:F3')
+  wsRingkasan.mergeCells('A3:H3')
   const r13 = wsRingkasan.getRow(3)
   r13.getCell(1).value = `Periode: ${dateRangeDisplay}`
   r13.getCell(1).font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF475569' } }
   r13.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
   r13.height = 18
 
-  wsRingkasan.mergeCells('A4:F4')
+  wsRingkasan.mergeCells('A4:H4')
   const r14 = wsRingkasan.getRow(4)
   r14.getCell(1).value = `Jenis Transaksi: ${typeFilterLabel}  |  Dibuat pada: ${generatedAtWib}`
   r14.getCell(1).font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF64748B' } }
@@ -335,56 +429,65 @@ export async function buildTransactionHistoryWorkbook(
 
   wsRingkasan.getRow(5).height = 12
 
-  // Section 1: Summary Metrics Table
-  wsRingkasan.mergeCells('A6:F6')
+  // Section 1: Summary Metrics & Reconciliation Table
+  wsRingkasan.mergeCells('A6:H6')
   const s1Header = wsRingkasan.getRow(6)
-  s1Header.getCell(1).value = 'RINGKASAN METRIK TRANSAKSI'
+  s1Header.getCell(1).value = 'RINGKASAN VALUASI & REKONSILIASI MUTASI PERSEDIAAN'
   s1Header.getCell(1).font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } }
   s1Header.getCell(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } }
   s1Header.getCell(1).alignment = { horizontal: 'left', vertical: 'middle', indent: 1 }
   s1Header.height = 24
 
-  const metricsData = [
-    { label: 'Jumlah Transaksi', val: totalTransactions, isCurrency: false, unit: 'transaksi' },
-    { label: 'Total Stok Masuk', val: totalStokMasuk, isCurrency: false, unit: 'unit' },
-    { label: 'Total Stok Keluar', val: totalStokKeluar, isCurrency: false, unit: 'unit' },
-    { label: 'Perubahan Stok Bersih', val: perubahanStokBersih, isCurrency: false, unit: 'unit' },
-    { label: 'Nilai Mutasi Masuk', val: allUnpriced ? null : nilaiMutasiMasuk, isCurrency: true },
-    { label: 'Nilai Mutasi Keluar', val: allUnpriced ? null : nilaiMutasiKeluar, isCurrency: true },
-    { label: 'Selisih Nilai Mutasi', val: allUnpriced ? null : selisihNilaiMutasi, isCurrency: true },
-    { label: 'Transaksi Tanpa Harga Historis', val: unpricedCount, isCurrency: false, unit: 'transaksi' },
+  const reconciliationData: { label: string; val: number | string | null; isCurrency: boolean; isStatus?: boolean; highlight?: boolean }[] = [
+    { label: 'Nilai Stok Awal (Sebelum Periode)', val: allUnpriced ? null : nilaiStokAwal, isCurrency: true },
+    { label: 'Nilai Mutasi Masuk dari Barang Masuk', val: allUnpriced ? null : mutasiMasukInVal, isCurrency: true },
+    { label: 'Nilai Mutasi Masuk dari Koreksi Tambah', val: allUnpriced ? null : mutasiMasukAdjVal, isCurrency: true },
+    { label: 'Nilai Mutasi Masuk dari Reversal', val: allUnpriced ? null : mutasiMasukRevVal, isCurrency: true },
+    { label: 'Total Nilai Mutasi Masuk', val: allUnpriced ? null : totalMutasiMasukVal, isCurrency: true, highlight: true },
+    { label: 'Nilai Mutasi Keluar dari Barang Keluar', val: allUnpriced ? null : mutasiKeluarOutVal, isCurrency: true },
+    { label: 'Nilai Mutasi Keluar dari Koreksi Kurang', val: allUnpriced ? null : mutasiKeluarAdjVal, isCurrency: true },
+    { label: 'Nilai Mutasi Keluar dari Reversal', val: allUnpriced ? null : mutasiKeluarRevVal, isCurrency: true },
+    { label: 'Total Nilai Mutasi Keluar', val: allUnpriced ? null : totalMutasiKeluarVal, isCurrency: true, highlight: true },
+    { label: 'Nilai Stok Akhir (Akhir Periode)', val: allUnpriced ? null : nilaiStokAkhir, isCurrency: true, highlight: true },
+    { label: 'Selisih Rekonsiliasi (Awal + Masuk - Keluar - Akhir)', val: allUnpriced ? null : selisihRekonsiliasi, isCurrency: true },
+    { label: 'Status Rekonsiliasi Persediaan', val: allUnpriced ? 'TIDAK DAPAT DIHITUNG' : statusRekonsiliasi, isCurrency: false, isStatus: true },
+    { label: 'Jumlah Transaksi Tanpa Snapshot Harga', val: `${unpricedCount} transaksi`, isCurrency: false },
   ]
 
   let mRowIdx = 7
-  for (const m of metricsData) {
+  for (const m of reconciliationData) {
     const row = wsRingkasan.getRow(mRowIdx)
     row.height = 20
 
     const cellA = row.getCell(1)
     cellA.value = m.label
-    cellA.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF334155' } }
-    cellA.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } }
+    cellA.font = { name: 'Calibri', size: 10, bold: true, color: { argb: m.highlight ? 'FF0F172A' : 'FF334155' } }
+    cellA.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: m.highlight ? 'FFE2E8F0' : 'FFF8FAFC' } }
     cellA.border = thinBorder
     cellA.alignment = { vertical: 'middle', indent: 1 }
 
     const cellB = row.getCell(2)
     if (m.val === null) {
-      cellB.value = 'Nilai mutasi belum dapat dihitung'
+      cellB.value = 'Belum dapat dihitung'
       cellB.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF94A3B8' } }
       cellB.alignment = { horizontal: 'left', vertical: 'middle' }
-    } else if (m.isCurrency) {
+    } else if (m.isStatus) {
+      cellB.value = String(m.val)
+      cellB.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: m.val === 'SEIMBANG' ? 'FF15803D' : 'FFB91C1C' } }
+      cellB.alignment = { horizontal: 'left', vertical: 'middle' }
+    } else if (m.isCurrency && typeof m.val === 'number') {
       cellB.value = m.val
       cellB.numFmt = currencyFormat
       cellB.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF0F172A' } }
       cellB.alignment = { horizontal: 'right', vertical: 'middle' }
     } else {
-      cellB.value = `${m.val.toLocaleString('id-ID')} ${m.unit || ''}`.trim()
+      cellB.value = String(m.val)
       cellB.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF0F172A' } }
       cellB.alignment = { horizontal: 'left', vertical: 'middle' }
     }
     cellB.border = thinBorder
 
-    for (let c = 3; c <= 6; c++) {
+    for (let c = 3; c <= 8; c++) {
       const cellC = row.getCell(c)
       cellC.border = thinBorder
     }
@@ -395,14 +498,14 @@ export async function buildTransactionHistoryWorkbook(
   // Footnote for unpriced transactions
   const fnRow = wsRingkasan.getRow(mRowIdx)
   fnRow.height = 20
-  wsRingkasan.mergeCells(`A${mRowIdx}:F${mRowIdx}`)
+  wsRingkasan.mergeCells(`A${mRowIdx}:H${mRowIdx}`)
   const fnCell = fnRow.getCell(1)
   if (allUnpriced) {
-    fnCell.value = '* Catatan: Nilai mutasi belum dapat dihitung karena seluruh transaksi tidak memiliki harga historis.'
+    fnCell.value = '* Catatan: Nilai persediaan belum dapat dihitung karena seluruh transaksi tidak memiliki snapshot harga historis.'
   } else if (unpricedCount > 0) {
-    fnCell.value = `* Catatan: Nilai mutasi hanya mencakup transaksi yang memiliki harga historis (${unpricedCount} transaksi belum memiliki harga).`
+    fnCell.value = `* Catatan: Rekonsiliasi hanya mencakup transaksi dengan harga historis (${unpricedCount} transaksi lama belum memiliki snapshot).`
   } else {
-    fnCell.value = '* Catatan: Seluruh transaksi memiliki catatan harga historis lengkap.'
+    fnCell.value = '* Catatan: Seluruh transaksi memiliki catatan snapshot harga historis dan rekonsiliasi bernilai seimbang (Selisih = Rp0).'
   }
   fnCell.font = { name: 'Calibri', size: 9, italic: true, color: { argb: 'FF64748B' } }
   fnCell.alignment = { vertical: 'middle', indent: 1 }
@@ -410,7 +513,7 @@ export async function buildTransactionHistoryWorkbook(
   mRowIdx += 2
 
   // Section 2: Recap Table by Transaction Type
-  wsRingkasan.mergeCells(`A${mRowIdx}:F${mRowIdx}`)
+  wsRingkasan.mergeCells(`A${mRowIdx}:H${mRowIdx}`)
   const s2Header = wsRingkasan.getRow(mRowIdx)
   s2Header.getCell(1).value = 'REKAPITULASI BERDASARKAN JENIS TRANSAKSI'
   s2Header.getCell(1).font = { name: 'Calibri', size: 11, bold: true, color: { argb: 'FFFFFFFF' } }
@@ -425,13 +528,15 @@ export async function buildTransactionHistoryWorkbook(
   const rekapHeaders = [
     'Jenis Transaksi',
     'Jumlah Transaksi',
-    'Total Kuantitas Masuk',
-    'Total Kuantitas Keluar',
-    'Perubahan Bersih',
-    'Nilai Mutasi',
+    'Jumlah Mutasi Masuk',
+    'Nilai Mutasi Masuk',
+    'Jumlah Mutasi Keluar',
+    'Nilai Mutasi Keluar',
+    'Net Mutasi Kuantitas',
+    'Nilai Mutasi Persediaan',
   ]
 
-  for (let c = 1; c <= 6; c++) {
+  for (let c = 1; c <= 8; c++) {
     const cell = rekapHeaderRow.getCell(c)
     cell.value = rekapHeaders[c - 1]
     cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }
@@ -469,34 +574,52 @@ export async function buildTransactionHistoryWorkbook(
     c2.value = grp.count
     c2.numFmt = '#,##0'
 
-    // Col 3: Masuk
+    // Col 3: Masuk Qty
     const c3 = row.getCell(3)
-    c3.value = grp.stokMasuk
-    c3.numFmt = '#,##0'
+    c3.value = grp.masukQty > 0 ? grp.masukQty : '—'
+    if (typeof c3.value === 'number') c3.numFmt = '#,##0'
 
-    // Col 4: Keluar
+    // Col 4: Masuk Val
     const c4 = row.getCell(4)
-    c4.value = grp.stokKeluar
-    c4.numFmt = '#,##0'
-
-    // Col 5: Perubahan Bersih
-    const c5 = row.getCell(5)
-    c5.value = grp.perubahanBersih
-    c5.numFmt = '+#,##0;-#,##0;0'
-
-    // Col 6: Nilai Mutasi
-    const c6 = row.getCell(6)
-    if (grp.count === 0 || grp.pricedCount === 0) {
-      c6.value = grp.count === 0 ? 0 : '—'
-      if (grp.count > 0 && grp.pricedCount === 0) {
-        c6.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF94A3B8' } }
-      }
+    if (grp.masukQty > 0 && grp.pricedCount > 0) {
+      c4.value = grp.masukVal
+      c4.numFmt = currencyFormat
     } else {
-      c6.value = grp.nilaiMutasi
-      c6.numFmt = currencyFormat
+      c4.value = '—'
+      c4.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF94A3B8' } }
     }
 
-    for (let c = 1; c <= 6; c++) {
+    // Col 5: Keluar Qty
+    const c5 = row.getCell(5)
+    c5.value = grp.keluarQty > 0 ? grp.keluarQty : '—'
+    if (typeof c5.value === 'number') c5.numFmt = '#,##0'
+
+    // Col 6: Keluar Val
+    const c6 = row.getCell(6)
+    if (grp.keluarQty > 0 && grp.pricedCount > 0) {
+      c6.value = grp.keluarVal
+      c6.numFmt = currencyFormat
+    } else {
+      c6.value = '—'
+      c6.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF94A3B8' } }
+    }
+
+    // Col 7: Net Qty
+    const c7 = row.getCell(7)
+    c7.value = grp.netQty
+    c7.numFmt = '+#,##0;-#,##0;0'
+
+    // Col 8: Net Val
+    const c8 = row.getCell(8)
+    if (grp.count > 0 && grp.pricedCount > 0) {
+      c8.value = grp.netVal
+      c8.numFmt = currencyFormat
+    } else {
+      c8.value = '—'
+      c8.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF94A3B8' } }
+    }
+
+    for (let c = 1; c <= 8; c++) {
       const cell = row.getCell(c)
       cell.border = thinBorder
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
@@ -514,22 +637,40 @@ export async function buildTransactionHistoryWorkbook(
   totalRow.getCell(1).value = 'TOTAL'
   totalRow.getCell(2).value = totalTransactions
   totalRow.getCell(2).numFmt = '#,##0'
-  totalRow.getCell(3).value = totalStokMasuk
+  totalRow.getCell(3).value = totalMutasiMasukQty
   totalRow.getCell(3).numFmt = '#,##0'
-  totalRow.getCell(4).value = totalStokKeluar
-  totalRow.getCell(4).numFmt = '#,##0'
-  totalRow.getCell(5).value = perubahanStokBersih
-  totalRow.getCell(5).numFmt = '+#,##0;-#,##0;0'
 
-  const totC6 = totalRow.getCell(6)
-  if (allUnpriced) {
-    totC6.value = '—'
+  const totC4 = totalRow.getCell(4)
+  if (!allUnpriced) {
+    totC4.value = totalMutasiMasukVal
+    totC4.numFmt = currencyFormat
   } else {
-    totC6.value = selisihNilaiMutasi
-    totC6.numFmt = currencyFormat
+    totC4.value = '—'
   }
 
-  for (let c = 1; c <= 6; c++) {
+  totalRow.getCell(5).value = totalMutasiKeluarQty
+  totalRow.getCell(5).numFmt = '#,##0'
+
+  const totC6 = totalRow.getCell(6)
+  if (!allUnpriced) {
+    totC6.value = totalMutasiKeluarVal
+    totC6.numFmt = currencyFormat
+  } else {
+    totC6.value = '—'
+  }
+
+  totalRow.getCell(7).value = netMutasiQty
+  totalRow.getCell(7).numFmt = '+#,##0;-#,##0;0'
+
+  const totC8 = totalRow.getCell(8)
+  if (!allUnpriced) {
+    totC8.value = totalMutasiMasukVal - totalMutasiKeluarVal
+    totC8.numFmt = currencyFormat
+  } else {
+    totC8.value = '—'
+  }
+
+  for (let c = 1; c <= 8; c++) {
     const cell = totalRow.getCell(c)
     cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF0F172A' } }
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }
@@ -544,7 +685,7 @@ export async function buildTransactionHistoryWorkbook(
   }
 
   // ============================================================================
-  // SHEET 2: RIWAYAT TRANSAKSI
+  // SHEET 2: RIWAYAT TRANSAKSI (20 KOLOM)
   // ============================================================================
   const wsRiwayat = workbook.addWorksheet('Riwayat Transaksi', {
     views: [{ state: 'frozen', ySplit: 5 }],
@@ -558,34 +699,43 @@ export async function buildTransactionHistoryWorkbook(
 
   wsRiwayat.columns = [
     { header: 'No.', key: 'no', width: 6 },
-    { header: 'Tanggal dan Waktu', key: 'txDate', width: 18 },
+    { header: 'Tanggal dan Waktu (WIB)', key: 'txDate', width: 22 },
     { header: 'Nomor Transaksi', key: 'txNo', width: 22 },
     { header: 'Jenis Transaksi', key: 'txType', width: 24 },
-    { header: 'Barang', key: 'itemDisplay', width: 36 },
-    { header: 'Perubahan Stok', key: 'stokChange', width: 16 },
-    { header: 'Stok Sebelum → Sesudah', key: 'stokTrans', width: 20 },
-    { header: 'Harga Satuan', key: 'unitPrice', width: 18 },
-    { header: 'Nilai Mutasi', key: 'txValue', width: 20 },
+    { header: 'Kode Barang', key: 'sku', width: 14 },
+    { header: 'Nama Barang', key: 'itemName', width: 32 },
+    { header: 'Kategori', key: 'category', width: 18 },
+    { header: 'Satuan', key: 'unit', width: 12 },
+    { header: 'Jumlah Mutasi Masuk', key: 'masukQty', width: 18 },
+    { header: 'Nilai Mutasi Masuk', key: 'masukVal', width: 20 },
+    { header: 'Jumlah Mutasi Keluar', key: 'keluarQty', width: 18 },
+    { header: 'Nilai Mutasi Keluar', key: 'keluarVal', width: 20 },
+    { header: 'Stok Setelah Transaksi', key: 'stokAfter', width: 18 },
+    { header: 'Harga Historis Transaksi', key: 'unitCost', width: 20 },
+    { header: 'Harga Rata-Rata Setelah Transaksi', key: 'avgCostAfter', width: 24 },
+    { header: 'Nilai Persediaan Setelah Transaksi', key: 'invValueAfter', width: 26 },
+    { header: 'Transaksi Referensi', key: 'refTxNo', width: 24 },
     { header: 'Petugas', key: 'user', width: 20 },
-    { header: 'Alasan', key: 'reason', width: 32 },
+    { header: 'Keterangan', key: 'reason', width: 30 },
+    { header: 'Status Harga', key: 'costStatus', width: 16 },
   ]
 
   // Title Block (Rows 1-3)
-  wsRiwayat.mergeCells('A1:K1')
+  wsRiwayat.mergeCells('A1:T1')
   const r21 = wsRiwayat.getRow(1)
   r21.getCell(1).value = instNameDisplay
   r21.getCell(1).font = { name: 'Calibri', size: 15, bold: true, color: { argb: 'FF1E293B' } }
   r21.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
   r21.height = 26
 
-  wsRiwayat.mergeCells('A2:K2')
+  wsRiwayat.mergeCells('A2:T2')
   const r22 = wsRiwayat.getRow(2)
   r22.getCell(1).value = headerTextDisplay
   r22.getCell(1).font = { name: 'Calibri', size: 13, bold: true, color: { argb: 'FF334155' } }
   r22.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
   r22.height = 20
 
-  wsRiwayat.mergeCells('A3:K3')
+  wsRiwayat.mergeCells('A3:T3')
   const r23 = wsRiwayat.getRow(3)
   r23.getCell(1).value = `Periode: ${dateRangeDisplay}  |  Filter: ${typeFilterLabel}`
   r23.getCell(1).font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF475569' } }
@@ -599,22 +749,31 @@ export async function buildTransactionHistoryWorkbook(
   hRow2.height = 24
   const hTitles2 = [
     'No.',
-    'Tanggal dan Waktu',
+    'Tanggal dan Waktu (WIB)',
     'Nomor Transaksi',
     'Jenis Transaksi',
-    'Barang',
-    'Perubahan Stok',
-    'Stok Sebelum → Sesudah',
-    'Harga Satuan',
-    'Nilai Mutasi',
+    'Kode Barang',
+    'Nama Barang',
+    'Kategori',
+    'Satuan',
+    'Jumlah Mutasi Masuk',
+    'Nilai Mutasi Masuk',
+    'Jumlah Mutasi Keluar',
+    'Nilai Mutasi Keluar',
+    'Stok Setelah Transaksi',
+    'Harga Historis Transaksi',
+    'Harga Rata-Rata Setelah Transaksi',
+    'Nilai Persediaan Setelah Transaksi',
+    'Transaksi Referensi',
     'Petugas',
-    'Alasan',
+    'Keterangan',
+    'Status Harga',
   ]
 
-  for (let c = 1; c <= 11; c++) {
+  for (let c = 1; c <= 20; c++) {
     const cell = hRow2.getCell(c)
     cell.value = hTitles2[c - 1]
-    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }
+    cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FFFFFFFF' } }
     cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E293B' } }
     cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
     cell.border = thinBorder
@@ -624,14 +783,14 @@ export async function buildTransactionHistoryWorkbook(
   let rIdx2 = 6
 
   if (txList.length === 0) {
-    wsRiwayat.mergeCells(`A6:K6`)
+    wsRiwayat.mergeCells(`A6:T6`)
     const emptyRow = wsRiwayat.getRow(6)
     emptyRow.height = 32
     const emptyCell = emptyRow.getCell(1)
     emptyCell.value = 'Tidak ada transaksi pada periode dan filter yang dipilih'
     emptyCell.font = { name: 'Calibri', size: 10, italic: true, color: { argb: 'FF64748B' } }
     emptyCell.alignment = { horizontal: 'center', vertical: 'middle' }
-    for (let c = 1; c <= 11; c++) {
+    for (let c = 1; c <= 20; c++) {
       emptyRow.getCell(c).border = thinBorder
     }
   } else {
@@ -647,15 +806,14 @@ export async function buildTransactionHistoryWorkbook(
 
       const dateStr = formatInTimeZone(new Date(tx.transaction_at), TZ, 'dd/MM/yyyy HH:mm')
       const symbol = tx.units?.symbol || 'pcs'
-      const itemName = tx.items?.name || 'Barang'
-      const itemSku = tx.items?.sku || ''
-      const itemFormatted = sanitizeUserString(itemSku ? `${itemName} (${itemSku})` : itemName)
+      const itemName = sanitizeUserString(tx.items?.name || '—')
+      const itemSku = tx.items?.sku || '—'
+      const categoryName = sanitizeUserString(tx.items?.categories?.name || '—')
 
       const delta = tx.quantity_delta
-      const deltaFormatted = delta > 0 ? `+${delta} ${symbol}` : `${delta} ${symbol}`
-      const stockTransition = `${tx.stock_before ?? 0} → ${tx.stock_after ?? 0}`
       const userName = sanitizeUserString(tx.profiles?.full_name || tx.profiles?.username || 'System')
       const reasonFormatted = sanitizeUserString(tx.reason || '—')
+      const refTxNo = tx.original_transaction_id ? refTxNoMap[tx.original_transaction_id] || tx.original_transaction_id : '—'
 
       let typeLabel = TYPE_LABELS[tx.transaction_type] || tx.transaction_type
       if (tx.transaction_type === 'REVERSAL') {
@@ -663,90 +821,143 @@ export async function buildTransactionHistoryWorkbook(
       }
 
       // Col 1: No.
-      const c1 = row.getCell(1)
-      c1.value = i + 1
-      c1.alignment = { horizontal: 'center', vertical: 'middle' }
+      row.getCell(1).value = i + 1
 
       // Col 2: Tanggal dan Waktu
-      const c2 = row.getCell(2)
-      c2.value = dateStr
-      c2.alignment = { horizontal: 'center', vertical: 'middle' }
+      row.getCell(2).value = dateStr
 
       // Col 3: Nomor Transaksi
-      const c3 = row.getCell(3)
-      c3.value = tx.transaction_number
-      c3.alignment = { horizontal: 'center', vertical: 'middle' }
+      row.getCell(3).value = tx.transaction_number
 
       // Col 4: Jenis Transaksi
       const c4 = row.getCell(4)
       c4.value = typeLabel
-      c4.alignment = { horizontal: 'left', vertical: 'middle' }
       if (tx.transaction_type === 'REVERSAL') {
-        c4.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFC2410C' } }
+        c4.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FFC2410C' } }
       } else if (tx.transaction_type === 'INITIAL') {
-        c4.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF1D4ED8' } }
+        c4.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF1D4ED8' } }
       }
 
-      // Col 5: Barang
-      const c5 = row.getCell(5)
-      c5.value = itemFormatted
-      c5.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }
+      // Col 5: Kode Barang (SKU)
+      row.getCell(5).value = itemSku
 
-      // Col 6: Perubahan Stok
-      const c6 = row.getCell(6)
-      c6.value = deltaFormatted
-      c6.alignment = { horizontal: 'right', vertical: 'middle' }
-      if (delta > 0) {
-        c6.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF15803D' } }
-      } else if (delta < 0) {
-        c6.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFB91C1C' } }
-      }
+      // Col 6: Nama Barang
+      row.getCell(6).value = itemName
 
-      // Col 7: Stok Sebelum -> Sesudah
-      const c7 = row.getCell(7)
-      c7.value = stockTransition
-      c7.alignment = { horizontal: 'center', vertical: 'middle' }
+      // Col 7: Kategori
+      row.getCell(7).value = categoryName
 
-      // Col 8: Harga Satuan
-      const c8 = row.getCell(8)
-      if (cost?.has_cost && cost.base_unit_cost !== null) {
-        c8.value = cost.base_unit_cost
-        c8.numFmt = currencyFormat
-        c8.alignment = { horizontal: 'right', vertical: 'middle' }
-      } else {
-        c8.value = '—'
-        c8.alignment = { horizontal: 'center', vertical: 'middle' }
-        c8.font = { name: 'Calibri', size: 10, color: { argb: 'FF94A3B8' } }
-      }
+      // Col 8: Satuan
+      row.getCell(8).value = symbol
 
-      // Col 9: Nilai Mutasi
+      // Col 9 & 10: Jumlah & Nilai Mutasi Masuk
       const c9 = row.getCell(9)
-      if (cost?.has_cost && cost.transaction_value !== null) {
-        c9.value = cost.transaction_value
-        c9.numFmt = currencyFormat
-        c9.alignment = { horizontal: 'right', vertical: 'middle' }
+      const c10 = row.getCell(10)
+      if (delta > 0) {
+        c9.value = delta
+        c9.numFmt = '#,##0'
+        c9.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF15803D' } }
+
+        if (cost?.has_cost && cost.transaction_value !== null) {
+          c10.value = Math.abs(cost.transaction_value)
+          c10.numFmt = currencyFormat
+        } else {
+          c10.value = '—'
+          c10.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF94A3B8' } }
+        }
       } else {
         c9.value = '—'
-        c9.alignment = { horizontal: 'center', vertical: 'middle' }
-        c9.font = { name: 'Calibri', size: 10, color: { argb: 'FF94A3B8' } }
+        c9.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF94A3B8' } }
+        c10.value = '—'
+        c10.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF94A3B8' } }
       }
 
-      // Col 10: Petugas
-      const c10 = row.getCell(10)
-      c10.value = userName
-      c10.alignment = { horizontal: 'left', vertical: 'middle' }
-
-      // Col 11: Alasan
+      // Col 11 & 12: Jumlah & Nilai Mutasi Keluar
       const c11 = row.getCell(11)
-      c11.value = reasonFormatted
-      c11.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }
+      const c12 = row.getCell(12)
+      if (delta < 0) {
+        c11.value = Math.abs(delta)
+        c11.numFmt = '#,##0'
+        c11.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FFB91C1C' } }
 
-      for (let c = 1; c <= 11; c++) {
+        if (cost?.has_cost && cost.transaction_value !== null) {
+          c12.value = Math.abs(cost.transaction_value)
+          c12.numFmt = currencyFormat
+        } else {
+          c12.value = '—'
+          c12.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF94A3B8' } }
+        }
+      } else {
+        c11.value = '—'
+        c11.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF94A3B8' } }
+        c12.value = '—'
+        c12.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF94A3B8' } }
+      }
+
+      // Col 13: Stok Setelah Transaksi
+      const c13 = row.getCell(13)
+      c13.value = tx.stock_after ?? 0
+      c13.numFmt = '#,##0'
+
+      // Col 14: Harga Historis Transaksi
+      const c14 = row.getCell(14)
+      if (cost?.has_cost && cost.base_unit_cost !== null) {
+        c14.value = cost.base_unit_cost
+        c14.numFmt = currencyFormat
+      } else {
+        c14.value = '—'
+        c14.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF94A3B8' } }
+      }
+
+      // Col 15: Harga Rata-Rata Setelah Transaksi
+      const c15 = row.getCell(15)
+      if (cost?.has_cost && cost.average_cost_after !== null) {
+        c15.value = cost.average_cost_after
+        c15.numFmt = currencyFormat
+      } else {
+        c15.value = '—'
+        c15.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF94A3B8' } }
+      }
+
+      // Col 16: Nilai Persediaan Setelah Transaksi
+      const c16 = row.getCell(16)
+      if (cost?.has_cost && cost.inventory_value_after !== null) {
+        c16.value = cost.inventory_value_after
+        c16.numFmt = currencyFormat
+      } else {
+        c16.value = '—'
+        c16.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF94A3B8' } }
+      }
+
+      // Col 17: Transaksi Referensi
+      row.getCell(17).value = refTxNo
+
+      // Col 18: Petugas
+      row.getCell(18).value = userName
+
+      // Col 19: Keterangan
+      row.getCell(19).value = reasonFormatted
+
+      // Col 20: Status Harga
+      const c20 = row.getCell(20)
+      c20.value = cost?.has_cost ? 'Tersedia' : 'Belum Tersedia'
+      if (!cost?.has_cost) {
+        c20.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF94A3B8' } }
+      }
+
+      for (let c = 1; c <= 20; c++) {
         const cell = row.getCell(c)
         cell.border = thinBorder
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
         if (!cell.font) {
-          cell.font = { name: 'Calibri', size: 10, color: { argb: 'FF0F172A' } }
+          cell.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF0F172A' } }
+        }
+        if ([1, 2, 3, 5, 8, 17, 20].includes(c)) {
+          cell.alignment = { horizontal: 'center', vertical: 'middle' }
+        } else if ([9, 10, 11, 12, 13, 14, 15, 16].includes(c)) {
+          cell.alignment = { horizontal: 'right', vertical: 'middle' }
+        } else {
+          cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }
         }
       }
 
@@ -769,25 +980,25 @@ export async function buildTransactionHistoryWorkbook(
 
   wsAudit.columns = [
     { header: 'No.', key: 'no', width: 6 },
-    { header: 'Nomor Transaksi', key: 'txNo', width: 22 },
-    { header: 'Nomor Transaksi Referensi', key: 'refTxNo', width: 24 },
+    { header: 'Transaction ID', key: 'txId', width: 36 },
     { header: 'Transaction Type', key: 'type', width: 18 },
-    { header: 'SKU', key: 'sku', width: 14 },
+    { header: 'Arah Mutasi', key: 'direction', width: 14 },
+    { header: 'Kode Barang (SKU)', key: 'sku', width: 14 },
     { header: 'Nama Barang', key: 'itemName', width: 32 },
-    { header: 'Quantity Input', key: 'inQty', width: 14 },
-    { header: 'Satuan Input', key: 'inUnit', width: 12 },
-    { header: 'Quantity Dasar', key: 'baseQty', width: 14 },
-    { header: 'Satuan Dasar', key: 'baseUnit', width: 12 },
+    { header: 'Calculation Basis', key: 'basis', width: 22 },
+    { header: 'Quantity Before', key: 'qBefore', width: 14 },
     { header: 'Quantity Delta', key: 'delta', width: 14 },
-    { header: 'Stok Sebelum', key: 'sBefore', width: 12 },
-    { header: 'Stok Sesudah', key: 'sAfter', width: 12 },
-    { header: 'Harga Historis', key: 'cost', width: 18 },
-    { header: 'Nilai Mutasi', key: 'val', width: 20 },
-    { header: 'Status Harga', key: 'costStatus', width: 16 },
-    { header: 'Nama Petugas', key: 'userName', width: 20 },
-    { header: 'User ID', key: 'userId', width: 36 },
-    { header: 'Alasan', key: 'reason', width: 30 },
-    { header: 'Timestamp Lengkap', key: 'ts', width: 24 },
+    { header: 'Quantity After', key: 'qAfter', width: 14 },
+    { header: 'Average Cost Before', key: 'avgBefore', width: 20 },
+    { header: 'Transaction Unit Cost', key: 'unitCost', width: 20 },
+    { header: 'Nilai Mutasi Persediaan', key: 'mutasiVal', width: 22 },
+    { header: 'Average Cost After', key: 'avgAfter', width: 20 },
+    { header: 'Inventory Value Before', key: 'invBefore', width: 22 },
+    { header: 'Inventory Value After', key: 'invAfter', width: 22 },
+    { header: 'Referenced Transaction ID', key: 'refId', width: 36 },
+    { header: 'Status Snapshot', key: 'snapStatus', width: 18 },
+    { header: 'Petugas / User ID', key: 'user', width: 36 },
+    { header: 'Alasan / Keterangan', key: 'reason', width: 30 },
   ]
 
   // Title Block (Rows 1-3)
@@ -800,7 +1011,7 @@ export async function buildTransactionHistoryWorkbook(
 
   wsAudit.mergeCells('A2:T2')
   const r32 = wsAudit.getRow(2)
-  r32.getCell(1).value = 'DETAIL AUDIT TRANSAKSI STOK'
+  r32.getCell(1).value = 'DETAIL AUDIT TRAIL TRANSAKSI & VALUASI PERSEDIAAN'
   r32.getCell(1).font = { name: 'Calibri', size: 13, bold: true, color: { argb: 'FF334155' } }
   r32.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
   r32.height = 20
@@ -819,25 +1030,25 @@ export async function buildTransactionHistoryWorkbook(
   hRow3.height = 24
   const hTitles3 = [
     'No.',
-    'Nomor Transaksi',
-    'Nomor Transaksi Referensi',
+    'Transaction ID',
     'Transaction Type',
-    'SKU',
+    'Arah Mutasi',
+    'Kode Barang (SKU)',
     'Nama Barang',
-    'Quantity Input',
-    'Satuan Input',
-    'Quantity Dasar',
-    'Satuan Dasar',
+    'Calculation Basis',
+    'Quantity Before',
     'Quantity Delta',
-    'Stok Sebelum',
-    'Stok Sesudah',
-    'Harga Historis',
-    'Nilai Mutasi',
-    'Status Harga',
-    'Nama Petugas',
-    'User ID',
-    'Alasan',
-    'Timestamp Lengkap',
+    'Quantity After',
+    'Average Cost Before',
+    'Transaction Unit Cost',
+    'Nilai Mutasi Persediaan',
+    'Average Cost After',
+    'Inventory Value Before',
+    'Inventory Value After',
+    'Referenced Transaction ID',
+    'Status Snapshot',
+    'Petugas / User ID',
+    'Alasan / Keterangan',
   ]
 
   for (let c = 1; c <= 20; c++) {
@@ -873,59 +1084,94 @@ export async function buildTransactionHistoryWorkbook(
       const isEven = i % 2 === 0
       const rowBg = isEven ? 'FFF8FAFC' : 'FFFFFFFF'
 
-      const refTxNo = tx.original_transaction_id ? refTxNoMap[tx.original_transaction_id] || tx.original_transaction_id : '—'
-      const symbol = tx.units?.symbol || 'pcs'
+      const direction = tx.quantity_delta > 0 ? 'MASUK' : tx.quantity_delta < 0 ? 'KELUAR' : 'NEUTRAL'
+      let calcBasis = 'LEGACY_UNPRICED'
+      if (cost?.has_cost) {
+        if (tx.transaction_type === 'IN' || tx.transaction_type === 'INITIAL') calcBasis = 'ACQUISITION_PRICE'
+        else if (tx.transaction_type === 'OUT' || tx.transaction_type.startsWith('ADJUSTMENT')) calcBasis = 'MOVING_AVERAGE'
+        else if (tx.transaction_type === 'REVERSAL') calcBasis = 'REFERENCE_SNAPSHOT'
+      }
 
       row.getCell(1).value = i + 1
-      row.getCell(2).value = tx.transaction_number
-      row.getCell(3).value = refTxNo
-      row.getCell(4).value = tx.transaction_type
+      row.getCell(2).value = tx.id
+      row.getCell(3).value = tx.transaction_type
+      row.getCell(4).value = direction
       row.getCell(5).value = tx.items?.sku || '—'
       row.getCell(6).value = sanitizeUserString(tx.items?.name || '—')
-      row.getCell(7).value = tx.input_quantity
-      row.getCell(7).numFmt = '#,##0'
-      row.getCell(8).value = symbol
-      row.getCell(9).value = tx.base_quantity
-      row.getCell(9).numFmt = '#,##0'
-      row.getCell(10).value = symbol
-      row.getCell(11).value = tx.quantity_delta
-      row.getCell(11).numFmt = '+#,##0;-#,##0;0'
-      row.getCell(12).value = tx.stock_before
-      row.getCell(12).numFmt = '#,##0'
-      row.getCell(13).value = tx.stock_after
-      row.getCell(13).numFmt = '#,##0'
+      row.getCell(7).value = calcBasis
 
-      // Col 14 & 15: Price & Mutation values (blank if unpriced)
-      const c14 = row.getCell(14)
+      row.getCell(8).value = tx.stock_before
+      row.getCell(8).numFmt = '#,##0'
+      row.getCell(9).value = tx.quantity_delta
+      row.getCell(9).numFmt = '+#,##0;-#,##0;0'
+      row.getCell(10).value = tx.stock_after
+      row.getCell(10).numFmt = '#,##0'
+
+      // Col 11: Average Cost Before
+      const c11 = row.getCell(11)
+      if (cost?.has_cost && cost.average_cost_before !== null) {
+        c11.value = cost.average_cost_before
+        c11.numFmt = currencyFormat
+      } else {
+        c11.value = null
+      }
+
+      // Col 12: Transaction Unit Cost
+      const c12 = row.getCell(12)
       if (cost?.has_cost && cost.base_unit_cost !== null) {
-        c14.value = cost.base_unit_cost
+        c12.value = cost.base_unit_cost
+        c12.numFmt = currencyFormat
+      } else {
+        c12.value = null
+      }
+
+      // Col 13: Nilai Mutasi Persediaan
+      const c13 = row.getCell(13)
+      if (cost?.has_cost && cost.transaction_value !== null) {
+        c13.value = Math.abs(cost.transaction_value)
+        c13.numFmt = currencyFormat
+      } else {
+        c13.value = null
+      }
+
+      // Col 14: Average Cost After
+      const c14 = row.getCell(14)
+      if (cost?.has_cost && cost.average_cost_after !== null) {
+        c14.value = cost.average_cost_after
         c14.numFmt = currencyFormat
       } else {
         c14.value = null
       }
 
+      // Col 15: Inventory Value Before
       const c15 = row.getCell(15)
-      if (cost?.has_cost && cost.transaction_value !== null) {
-        c15.value = cost.transaction_value
+      if (cost?.has_cost && cost.inventory_value_before !== null) {
+        c15.value = cost.inventory_value_before
         c15.numFmt = currencyFormat
       } else {
         c15.value = null
       }
 
-      // Col 16: Status Harga
-      row.getCell(16).value = cost?.has_cost ? 'Tersedia' : 'Belum Tersedia'
+      // Col 16: Inventory Value After
+      const c16 = row.getCell(16)
+      if (cost?.has_cost && cost.inventory_value_after !== null) {
+        c16.value = cost.inventory_value_after
+        c16.numFmt = currencyFormat
+      } else {
+        c16.value = null
+      }
 
-      // Col 17: Petugas
-      row.getCell(17).value = sanitizeUserString(tx.profiles?.full_name || tx.profiles?.username || 'System')
+      // Col 17: Referenced Transaction ID
+      row.getCell(17).value = tx.original_transaction_id || '—'
 
-      // Col 18: User ID
-      row.getCell(18).value = tx.performed_by || '—'
+      // Col 18: Status Snapshot
+      row.getCell(18).value = cost?.has_cost ? 'SNAPSHOT_AVAILABLE' : 'NO_SNAPSHOT'
 
-      // Col 19: Alasan
-      row.getCell(19).value = sanitizeUserString(tx.reason || '—')
+      // Col 19: User ID
+      row.getCell(19).value = tx.performed_by || '—'
 
-      // Col 20: Timestamp
-      row.getCell(20).value = tx.transaction_at
+      // Col 20: Reason
+      row.getCell(20).value = sanitizeUserString(tx.reason || '—')
 
       for (let c = 1; c <= 20; c++) {
         const cell = row.getCell(c)
@@ -933,9 +1179,9 @@ export async function buildTransactionHistoryWorkbook(
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
         cell.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF0F172A' } }
 
-        if ([1, 2, 3, 4, 5, 8, 10, 16, 20].includes(c)) {
+        if ([1, 2, 3, 4, 5, 7, 17, 18, 19].includes(c)) {
           cell.alignment = { horizontal: 'center', vertical: 'middle' }
-        } else if ([7, 9, 11, 12, 13, 14, 15].includes(c)) {
+        } else if ([8, 9, 10, 11, 12, 13, 14, 15, 16].includes(c)) {
           cell.alignment = { horizontal: 'right', vertical: 'middle' }
         } else {
           cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }
