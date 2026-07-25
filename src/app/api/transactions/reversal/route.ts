@@ -53,10 +53,10 @@ export async function POST(request: NextRequest) {
     })
 
     if (error) {
-      let msg = 'Gagal membalik transaksi.'
-      if (error.message.includes('already reversed')) msg = 'Transaksi ini sudah dibalik sebelumnya.'
-      if (error.message.includes('REVERSAL cannot be reversed')) msg = 'Transaksi pembalikan tidak dapat dibalik kembali.'
-      if (error.message.includes('negative stock')) msg = 'Pembalikan akan menyebabkan stok negatif.'
+      let msg = 'Gagal membatalkan transaksi.'
+      if (error.message.includes('already reversed')) msg = 'Transaksi ini sudah dibatalkan sebelumnya.'
+      if (error.message.includes('REVERSAL cannot be reversed')) msg = 'Transaksi pembatalan tidak dapat dibatalkan kembali.'
+      if (error.message.includes('negative stock')) msg = 'Pembatalan akan menyebabkan stok negatif.'
       return NextResponse.json({ success: false, error: msg }, { status: 422 })
     }
 

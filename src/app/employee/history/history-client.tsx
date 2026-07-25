@@ -40,7 +40,7 @@ export default function EmployeeHistoryClient({
       {/* Total Count Header Banner */}
       <div className="card flex items-center justify-between py-3">
         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Total Pengambilan Barang</span>
-        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800 dark:bg-blue-900/50 dark:text-blue-300">
+        <span className="rounded-full bg-blue-100 px-3 py-1 text-xs font-bold text-blue-800 dark:bg-[#22D3EE]/20 dark:text-[#22D3EE]">
           {totalCount} Transaksi
         </span>
       </div>
@@ -94,14 +94,14 @@ export default function EmployeeHistoryClient({
                         </span>
                       </td>
                       <td className="px-4 py-3">
-                        <p className="font-medium text-slate-900 dark:text-slate-100">{item?.name ?? '—'}</p>
+                        <p className="font-medium text-slate-900 dark:text-white">{item?.name ?? '—'}</p>
                         <p className="font-mono text-xs text-slate-500 dark:text-slate-400">SKU: {item?.sku ?? '—'}</p>
                       </td>
                       <td className="px-4 py-3 text-right font-bold text-amber-600 dark:text-amber-400">
                         -{String(tx.input_quantity)} {unit?.symbol ?? ''}
                       </td>
                       <td className="px-4 py-3 text-right text-xs text-slate-600 dark:text-slate-300">
-                        {String(tx.stock_before)} &rarr; <strong className="text-slate-900 dark:text-slate-100">{String(tx.stock_after)}</strong>
+                        {String(tx.stock_before)} &rarr; <strong className="text-slate-900 dark:text-white">{String(tx.stock_after)}</strong>
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
                         {new Date(tx.transaction_at).toLocaleString('id-ID')}

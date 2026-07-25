@@ -62,7 +62,7 @@ export default function EmployeeItemsClient({
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     {/* Category chip — theme-aware */}
-                    <span className="inline-block rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-slate-700 dark:text-slate-100">
+                    <span className="inline-block rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700 dark:bg-[#203552] dark:text-white">
                       {item.categories?.name ?? 'Tanpa Kategori'}
                     </span>
                     {isZero ? (
@@ -75,13 +75,13 @@ export default function EmployeeItemsClient({
                       </span>
                     ) : null}
                   </div>
-                  <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-slate-100">{item.name}</h3>
+                  <h3 className="mt-2 text-base font-bold text-slate-900 dark:text-white">{item.name}</h3>
                   <p className="font-mono text-xs text-slate-500 dark:text-slate-400">
                     SKU: {item.sku} · Barcode: {item.barcode}
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-slate-200 pt-3 dark:border-slate-700">
+                <div className="flex items-center justify-between border-t border-slate-200 pt-3 dark:border-white/10">
                   <span className="text-xs text-slate-500 dark:text-slate-400">Stok Tersedia:</span>
                   <span
                     className={`text-base font-bold ${
@@ -89,7 +89,7 @@ export default function EmployeeItemsClient({
                         ? 'text-red-600 dark:text-red-400'
                         : isLow
                           ? 'text-amber-600 dark:text-amber-400'
-                          : 'text-slate-900 dark:text-slate-100'
+                          : 'text-slate-900 dark:text-white'
                     }`}
                   >
                     {stock.toLocaleString('id-ID')} {item.base_unit?.symbol ?? ''}

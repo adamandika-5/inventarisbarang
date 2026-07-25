@@ -53,15 +53,15 @@ export default function EmployeeNav({ fullName }: EmployeeNavProps) {
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm transition-colors">
+    <header className="sticky top-0 z-30 border-b border-gray-200 dark:border-white/10 bg-white dark:bg-[#101D31] shadow-sm transition-colors">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
           {/* Logo & Brand */}
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 font-bold text-white shadow">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 dark:bg-[#22D3EE] font-bold text-white dark:text-[#0B1220] shadow">
               IB
             </div>
-            <Link href="/employee" className="text-lg font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-blue-400">
+            <Link href="/employee" className="text-lg font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-[#22D3EE]">
               InventarisBarang
             </Link>
           </div>
@@ -73,8 +73,8 @@ export default function EmployeeNav({ fullName }: EmployeeNavProps) {
                 key={link.href}
                 href={link.href}
                 className={`rounded-lg px-3 py-2 text-sm font-medium transition-colors ${isActive(link.href)
-                    ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-                    : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white'
+                    ? 'bg-blue-50 dark:bg-[#22D3EE]/10 text-blue-700 dark:text-[#22D3EE] font-semibold'
+                    : 'text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-[#203552] hover:text-gray-900 dark:hover:text-white'
                   }`}
               >
                 {link.label}
@@ -90,7 +90,7 @@ export default function EmployeeNav({ fullName }: EmployeeNavProps) {
               type="button"
               onClick={handleLogout}
               disabled={isLoggingOut}
-              className="rounded-lg border border-gray-300 dark:border-slate-600 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
+              className="rounded-lg border border-gray-300 dark:border-white/20 px-3 py-1.5 text-xs font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-50 dark:hover:bg-[#203552] focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
             >
               {isLoggingOut ? 'Keluar…' : 'Keluar'}
             </button>
@@ -104,7 +104,7 @@ export default function EmployeeNav({ fullName }: EmployeeNavProps) {
               onClick={() => setMobileMenuOpen((prev) => !prev)}
               aria-label={mobileMenuOpen ? 'Tutup menu' : 'Buka menu'}
               aria-expanded={mobileMenuOpen}
-              className="inline-flex items-center justify-center rounded-md p-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700 hover:text-gray-900 dark:hover:text-white focus:outline-none"
+              className="inline-flex items-center justify-center rounded-md p-2 text-gray-600 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-[#203552] hover:text-gray-900 dark:hover:text-white focus:outline-none"
             >
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {mobileMenuOpen ? (
@@ -120,7 +120,7 @@ export default function EmployeeNav({ fullName }: EmployeeNavProps) {
 
       {/* Mobile navigation menu dropdown */}
       {mobileMenuOpen && (
-        <div className="border-t border-gray-200 dark:border-slate-700 bg-white dark:bg-slate-800 px-4 pb-3 pt-2 md:hidden">
+        <div className="border-t border-gray-200 dark:border-white/10 bg-white dark:bg-[#101D31] px-4 pb-3 pt-2 md:hidden">
           <div className="space-y-1">
             {navLinks.map((link) => (
               <Link
@@ -128,8 +128,8 @@ export default function EmployeeNav({ fullName }: EmployeeNavProps) {
                 href={link.href}
                 onClick={() => setMobileMenuOpen(false)}
                 className={`block rounded-md px-3 py-2 text-base font-medium ${isActive(link.href)
-                    ? 'bg-blue-50 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300'
-                    : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-slate-700'
+                    ? 'bg-blue-50 dark:bg-[#22D3EE]/10 text-blue-700 dark:text-[#22D3EE] font-semibold'
+                    : 'text-gray-700 dark:text-slate-300 hover:bg-gray-100 dark:hover:bg-[#203552]'
                   }`}
               >
                 {link.label}
@@ -137,7 +137,7 @@ export default function EmployeeNav({ fullName }: EmployeeNavProps) {
             ))}
           </div>
 
-          <div className="mt-4 border-t border-gray-200 dark:border-slate-700 pt-3">
+          <div className="mt-4 border-t border-gray-200 dark:border-white/10 pt-3">
             <div className="px-3 text-sm font-medium text-gray-700 dark:text-slate-200 mb-2">Halo, {fullName}</div>
             {errorMsg && (
               <p className="px-3 mb-2 text-xs text-red-600 dark:text-red-400 font-medium">{errorMsg}</p>
@@ -146,7 +146,7 @@ export default function EmployeeNav({ fullName }: EmployeeNavProps) {
               type="button"
               onClick={handleLogout}
               disabled={isLoggingOut}
-              className="w-full rounded-md bg-gray-100 dark:bg-slate-700 px-3 py-2 text-center text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-slate-600 disabled:opacity-50"
+              className="w-full rounded-md bg-gray-100 dark:bg-[#203552] px-3 py-2 text-center text-sm font-medium text-gray-700 dark:text-slate-200 hover:bg-gray-200 dark:hover:bg-[#203552]/80 disabled:opacity-50"
             >
               {isLoggingOut ? 'Keluar…' : 'Keluar dari Akun'}
             </button>

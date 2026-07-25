@@ -36,15 +36,15 @@ export default async function ChangePasswordPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center bg-slate-50 dark:bg-slate-900 px-4 py-12 text-slate-900 dark:text-slate-100 transition-colors">
+    <main className="relative flex min-h-screen items-center justify-center bg-slate-50 dark:bg-[#0B1220] px-4 py-12 text-slate-900 dark:text-white transition-colors">
       <div className="absolute top-4 right-4">
         <ThemeToggle className="text-slate-600 dark:text-slate-300" />
       </div>
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 shadow-lg">
+          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600 dark:bg-[#22D3EE] shadow-lg">
             <svg
-              className="h-9 w-9 text-white"
+              className="h-9 w-9 text-white dark:text-[#0B1220]"
               viewBox="0 0 24 24"
               fill="none"
               stroke="currentColor"
@@ -60,8 +60,8 @@ export default async function ChangePasswordPage() {
           <h1 className="text-2xl font-bold text-slate-900 dark:text-white">InventarisBarang</h1>
         </div>
 
-        <div className="card bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-md">
-          <h2 className="mb-2 text-center text-lg font-semibold text-slate-800 dark:text-slate-200">
+        <div className="card bg-white dark:bg-[#17263D] border border-slate-200 dark:border-white/10 shadow-md">
+          <h2 className="mb-2 text-center text-lg font-semibold text-slate-800 dark:text-white">
             Ganti Kata Sandi
           </h2>
           <p className="mb-6 text-center text-sm text-slate-500 dark:text-slate-400">

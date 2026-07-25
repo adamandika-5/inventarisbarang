@@ -33,9 +33,9 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
   const fullName = profile.full_name ?? profile.username ?? 'Pegawai'
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 transition-colors">
+    <div className="min-h-screen bg-slate-50 dark:bg-[#0B1220] text-slate-900 dark:text-[#F8FAFC] transition-colors">
       <EmployeeNav fullName={fullName} />
-      <main className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <main className="mx-auto max-w-7xl min-w-0 px-4 py-6 sm:px-6 lg:px-8">
         {children}
       </main>
     </div>

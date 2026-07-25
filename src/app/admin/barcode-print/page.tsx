@@ -1,4 +1,4 @@
-﻿import type { Metadata } from 'next'
+import type { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import BarcodePrintClient from './barcode-print-client'
 
@@ -14,6 +14,14 @@ export default async function BarcodePrintPage() {
     .select('id,sku,barcode,barcode_format,name,is_active,base_unit:units!base_unit_id(id,name,symbol)')
     .eq('is_active', true)
     .order('name')
+
+  const { data: settings } = await supabase
+    .from('app_settings')
+    .select('default_barcode_label_count')
+    .limit(1)
+    .maybeSingle()
+
+  const defaultLabelCount = settings?.default_barcode_label_count ?? 1
 
   if (error) {
     return (
@@ -34,7 +42,7 @@ export default async function BarcodePrintPage() {
           Pilih barang, tentukan jumlah salinan, lalu cetak label barcode.
         </p>
       </div>
-      <BarcodePrintClient items={items ?? []} />
+      <BarcodePrintClient items={items ?? []} defaultLabelCount={defaultLabelCount} />
     </div>
   )
 }

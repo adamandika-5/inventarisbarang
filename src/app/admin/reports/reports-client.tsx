@@ -10,7 +10,7 @@
  */
 
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { useCallback, useState, useTransition } from 'react'
+import { useCallback, useState, useEffect, useTransition } from 'react'
 import { formatInTimeZone } from 'date-fns-tz'
 
 const TZ = 'Asia/Jakarta'
@@ -99,26 +99,15 @@ const TYPE_LABELS: Record<TransactionType, string> = {
 }
 
 const TYPE_CLASSES: Record<TransactionType, string> = {
-  IN: 'bg-green-100 text-green-800',
-  OUT: 'bg-red-100 text-red-800',
-  INITIAL: 'bg-blue-100 text-blue-800',
-  ADJUSTMENT_IN: 'bg-emerald-100 text-emerald-800',
-  ADJUSTMENT_OUT: 'bg-orange-100 text-orange-800',
-  REVERSAL: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
+  IN: 'bg-green-100 text-green-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-700/50',
+  OUT: 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 dark:border dark:border-red-700/50',
+  INITIAL: 'bg-blue-100 text-blue-800 dark:bg-[#22D3EE]/20 dark:text-[#22D3EE] dark:border dark:border-[#22D3EE]/30',
+  ADJUSTMENT_IN: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-700/50',
+  ADJUSTMENT_OUT: 'bg-orange-100 text-orange-800 dark:bg-amber-950/60 dark:text-amber-300 dark:border dark:border-amber-700/50',
+  REVERSAL: 'bg-slate-100 text-slate-700 dark:bg-[#0B1220] dark:text-slate-300 dark:border dark:border-white/10',
 }
 
-// ── CSV safety ─────────────────────────────────────────────────────────────────
-
-function sanitizeCsvValue(value: string | number | null | undefined): string {
-  const str = String(value ?? '')
-  // Prevent formula injection
-  if (/^[=+\-@]/.test(str)) return `'${str}`
-  // Escape double quotes
-  if (str.includes('"') || str.includes(',') || str.includes('\n')) {
-    return `"${str.replace(/"/g, '""')}"`
-  }
-  return str
-}
+// ── WIB formatting ─────────────────────────────────────────────────────────────────
 
 function formatWib(isoString: string): string {
   try {
@@ -149,8 +138,33 @@ export default function ReportsClient({
 
   const [localFrom, setLocalFrom] = useState(dateFrom)
   const [localTo, setLocalTo] = useState(dateTo)
-  const [localType, setLocalType] = useState(typeFilter)
-  const [filterError, setFilterError] = useState<string | null>(null)
+  const [localType, setLocalType] = useState(typeFilter ? typeFilter : 'ALL')
+
+  // Sync state when props/URL parameters change
+  useEffect(() => {
+    setLocalFrom(dateFrom)
+    setLocalTo(dateTo)
+    setLocalType(typeFilter ? typeFilter : 'ALL')
+  }, [dateFrom, dateTo, typeFilter])
+
+  const hasActiveFilter = Boolean(
+    searchParams.has('from') ||
+      searchParams.has('to') ||
+      (searchParams.has('type') && searchParams.get('type') !== 'ALL') ||
+      searchParams.has('item') ||
+      (typeFilter && typeFilter !== 'ALL') ||
+      (localType && localType !== 'ALL'),
+  )
+
+  const handleReset = (e: React.MouseEvent) => {
+    e.preventDefault()
+    setLocalFrom(dateFrom)
+    setLocalTo(dateTo)
+    setLocalType('ALL')
+    startTransition(() => {
+      router.replace('/admin/reports')
+    })
+  }
 
   const totalPages = Math.ceil(totalCount / pageSize)
 
@@ -171,82 +185,80 @@ export default function ReportsClient({
     [pathname, searchParams],
   )
 
-  const applyFilter = () => {
-    setFilterError(null)
-    if (localFrom > localTo) {
-      setFilterError('Tanggal awal tidak boleh lebih dari tanggal akhir.')
-      return
-    }
-    startTransition(() => {
-      router.push(buildUrl({ from: localFrom, to: localTo, type: localType, page: 1 }))
-    })
-  }
-
   const goToPage = (p: number) => {
     startTransition(() => {
       router.push(buildUrl({ page: p }))
     })
   }
 
-  // ── CSV Export ────────────────────────────────────────────────────────────────
+  // ── Excel Export Handlers ───────────────────────────────────────────────────
 
-  const handleExportCsv = () => {
-    const headers = [
-      'No. Transaksi',
-      'Tanggal (WIB)',
-      'Jenis',
-      'SKU Barang',
-      'Nama Barang',
-      'Jumlah Input',
-      'Satuan',
-      'Jumlah Dasar',
-      'Delta Stok',
-      'Stok Sebelum',
-      'Stok Sesudah',
-      'Dilakukan Oleh',
-      'Alasan',
-    ]
+  const [downloadingSummary, setDownloadingSummary] = useState(false)
+  const [downloadingDetail, setDownloadingDetail] = useState(false)
+  const [downloadError, setDownloadError] = useState<string | null>(null)
 
-    const rows = transactions.map((tx) => [
-      sanitizeCsvValue(tx.transaction_number),
-      sanitizeCsvValue(formatWib(tx.transaction_at)),
-      sanitizeCsvValue(TYPE_LABELS[tx.transaction_type] ?? tx.transaction_type),
-      sanitizeCsvValue(tx.items?.sku),
-      sanitizeCsvValue(tx.items?.name),
-      sanitizeCsvValue(tx.input_quantity),
-      sanitizeCsvValue(tx.units?.symbol),
-      sanitizeCsvValue(tx.base_quantity),
-      sanitizeCsvValue(tx.quantity_delta),
-      sanitizeCsvValue(tx.stock_before),
-      sanitizeCsvValue(tx.stock_after),
-      sanitizeCsvValue(tx.profiles?.full_name ?? tx.profiles?.username),
-      sanitizeCsvValue(tx.reason),
-    ])
+  const downloadExcel = async (url: string, defaultFilename: string) => {
+    try {
+      setDownloadError(null)
+      const res = await fetch(url)
+      if (!res.ok) {
+        throw new Error('Gagal mengunduh file laporan.')
+      }
 
-    const csvContent = [headers.join(','), ...rows.map((r) => r.join(','))].join('\n')
-    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `laporan-${dateFrom}-${dateTo}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+      let filename = defaultFilename
+      const disposition = res.headers.get('content-disposition')
+      if (disposition && disposition.includes('filename=')) {
+        const match = disposition.match(/filename="?([^"]+)"?/)
+        if (match?.[1]) {
+          filename = match[1]
+        }
+      }
+
+      const blob = await res.blob()
+      const blobUrl = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = blobUrl
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(blobUrl)
+    } catch (err: unknown) {
+      console.error(err)
+      setDownloadError(err instanceof Error ? err.message : 'Terjadi kesalahan saat mengunduh laporan.')
+    }
+  }
+
+  const handleExportInventorySummary = async () => {
+    setDownloadingSummary(true)
+    const url = `/api/reports/inventory-summary?from=${encodeURIComponent(localFrom)}&to=${encodeURIComponent(localTo)}`
+    await downloadExcel(url, `laporan-rincian-persediaan-${localFrom}-sampai-${localTo}.xlsx`)
+    setDownloadingSummary(false)
+  }
+
+  const handleExportTransactionsDetail = async () => {
+    setDownloadingDetail(true)
+    let url = `/api/reports/transactions-detail?from=${encodeURIComponent(localFrom)}&to=${encodeURIComponent(localTo)}`
+    if (localType && localType !== 'ALL') url += `&type=${encodeURIComponent(localType)}`
+    await downloadExcel(url, `riwayat-transaksi-${localFrom}-sampai-${localTo}.xlsx`)
+    setDownloadingDetail(false)
   }
 
   // ── Render ────────────────────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
-      {/* Filter bar */}
+      {/* Filter bar — Native GET Form */}
       <div className="card">
         <h2 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Filter Laporan</h2>
-        <div className="flex flex-wrap items-end gap-3">
+        <form action="/admin/reports" method="GET" className="flex flex-wrap items-end gap-3">
           <div>
             <label htmlFor="filter-from" className="label mb-1">
               Dari Tanggal
             </label>
             <input
               id="filter-from"
+              name="from"
               type="date"
               value={localFrom}
               onChange={(e) => setLocalFrom(e.target.value)}
@@ -260,6 +272,7 @@ export default function ReportsClient({
             </label>
             <input
               id="filter-to"
+              name="to"
               type="date"
               value={localTo}
               onChange={(e) => setLocalTo(e.target.value)}
@@ -273,31 +286,38 @@ export default function ReportsClient({
             </label>
             <select
               id="filter-type"
-              value={localType}
+              name="type"
+              value={localType || 'ALL'}
               onChange={(e) => setLocalType(e.target.value)}
               className="input w-44"
             >
-              <option value="">Semua Jenis</option>
+              <option value="ALL">Semua Jenis</option>
+              <option value="INITIAL">Stok Awal</option>
               <option value="IN">Barang Masuk</option>
               <option value="OUT">Barang Keluar</option>
-              <option value="INITIAL">Stok Awal</option>
-              <option value="ADJUSTMENT_IN">Penyesuaian +</option>
-              <option value="ADJUSTMENT_OUT">Penyesuaian −</option>
+              <option value="ADJUSTMENT">Penyesuaian</option>
               <option value="REVERSAL">Koreksi</option>
             </select>
           </div>
-          <button
-            type="button"
-            id="btn-apply-filter"
-            onClick={applyFilter}
-            className="btn-primary"
-          >
-            Terapkan
-          </button>
-          {filterError && (
-            <p className="w-full text-xs text-red-600">{filterError}</p>
-          )}
-        </div>
+          <div className="flex gap-2">
+            <button
+              type="submit"
+              id="btn-apply-filter"
+              className="btn-primary"
+            >
+              Terapkan
+            </button>
+            <button
+              type="button"
+              id="btn-reset-filter"
+              onClick={handleReset}
+              disabled={!hasActiveFilter}
+              className="btn-secondary flex items-center justify-center px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Reset
+            </button>
+          </div>
+        </form>
       </div>
 
       {/* Summary cards */}
@@ -328,27 +348,57 @@ export default function ReportsClient({
         />
       </div>
 
+      {/* Download Error Banner if any */}
+      {downloadError && (
+        <div className="alert-error flex items-center justify-between">
+          <span>{downloadError}</span>
+          <button
+            type="button"
+            onClick={() => setDownloadError(null)}
+            className="text-xs font-semibold underline ml-4"
+          >
+            Tutup
+          </button>
+        </div>
+      )}
+
       {/* Transactions table */}
       <div className="card">
-        <div className="mb-3 flex items-center justify-between">
+        <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
             Riwayat Transaksi
             <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
               ({totalCount.toLocaleString('id-ID')} total)
             </span>
           </h2>
-          <button
-            type="button"
-            id="btn-export-csv"
-            onClick={handleExportCsv}
-            disabled={transactions.length === 0}
-            className="btn-secondary text-sm disabled:opacity-40"
-          >
-            <svg className="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
-            Export CSV
-          </button>
+          <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto">
+            <button
+              type="button"
+              id="btn-export-inventory-summary"
+              onClick={handleExportInventorySummary}
+              disabled={downloadingSummary}
+              className="btn-primary flex items-center justify-center w-full whitespace-nowrap text-sm font-semibold shadow-sm xl:w-auto disabled:opacity-50"
+              title="Unduh Laporan Rincian Barang Persediaan dalam format Excel (Gambar 2)"
+            >
+              <svg className="mr-1.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              {downloadingSummary ? 'Mengunduh Rincian...' : 'Export Rincian Persediaan (Excel)'}
+            </button>
+            <button
+              type="button"
+              id="btn-export-transactions-detail"
+              onClick={handleExportTransactionsDetail}
+              disabled={downloadingDetail}
+              className="btn-secondary flex items-center justify-center w-full whitespace-nowrap text-sm font-semibold xl:w-auto disabled:opacity-50"
+              title="Unduh Detail Riwayat Transaksi dalam format Excel"
+            >
+              <svg className="mr-1.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+              </svg>
+              {downloadingDetail ? 'Mengunduh Riwayat...' : 'Export Riwayat Transaksi (Excel)'}
+            </button>
+          </div>
         </div>
 
         {transactions.length === 0 ? (
@@ -356,9 +406,9 @@ export default function ReportsClient({
             <p className="text-sm text-slate-500 dark:text-slate-400">Tidak ada transaksi dalam rentang tanggal ini.</p>
           </div>
         ) : (
-          <>
-            <div className="table-container">
-              <table className="table">
+          <div>
+            <div className="w-full overflow-x-auto">
+              <table className="table min-w-[1100px]">
                 <thead>
                   <tr>
                     <th>No. Transaksi</th>
@@ -443,7 +493,7 @@ export default function ReportsClient({
                 </div>
               </div>
             )}
-          </>
+          </div>
         )}
       </div>
 
@@ -519,22 +569,31 @@ function SummaryCard({
   color: 'green' | 'red' | 'blue' | 'orange' | 'gray'
   icon: string
 }) {
-  const colorClasses = {
-    green: 'bg-green-50 text-green-700 border-green-200',
-    red: 'bg-red-50 text-red-700 border-red-200',
-    blue: 'bg-blue-50 text-blue-700 border-blue-200',
-    orange: 'bg-orange-50 text-orange-700 border-orange-200',
-    gray: 'bg-slate-50 text-slate-700 border-slate-200 dark:bg-slate-700/60 dark:text-slate-300 dark:border-slate-600',
+  const cardBorderClasses = {
+    green: 'border-green-200 dark:border-emerald-800/50',
+    red: 'border-red-200 dark:border-red-800/50',
+    blue: 'border-blue-200 dark:border-[#22D3EE]/40',
+    orange: 'border-amber-200 dark:border-amber-800/50',
+    gray: 'border-slate-200 dark:border-white/10',
   }
+
+  const iconClasses = {
+    green: 'text-green-600 dark:text-emerald-400',
+    red: 'text-red-600 dark:text-red-400',
+    blue: 'text-blue-600 dark:text-[#22D3EE]',
+    orange: 'text-amber-600 dark:text-amber-400',
+    gray: 'text-slate-500 dark:text-slate-400',
+  }
+
   return (
-    <div className={`rounded-lg border p-4 ${colorClasses[color]}`}>
+    <div className={`rounded-lg border bg-white dark:bg-[#17263D] p-4 shadow-sm ${cardBorderClasses[color]}`}>
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium">{label}</span>
-        <span className="text-lg" aria-hidden="true">
+        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
+        <span className={`text-lg font-bold ${iconClasses[color]}`} aria-hidden="true">
           {icon}
         </span>
       </div>
-      <p className="mt-2 text-2xl font-bold tabular-nums">{value}</p>
+      <p className="mt-2 text-3xl font-extrabold tabular-nums text-slate-900 dark:text-white">{value}</p>
     </div>
   )
 }

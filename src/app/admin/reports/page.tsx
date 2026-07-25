@@ -1,9 +1,7 @@
-﻿import type { Metadata } from 'next'
+import type { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import ReportsClient from './reports-client'
 import { formatInTimeZone } from 'date-fns-tz'
-import type { TransactionType } from '@/types/database'
-
 
 export const metadata: Metadata = {
   title: 'Laporan — InventarisBarang Admin',
@@ -35,8 +33,9 @@ export default async function ReportsPage({
 
   const dateFrom = params.from ?? thirtyDaysAgoWib
   const dateTo = params.to ?? nowWib
-  const typeFilter = params.type ?? ''
-  const itemFilter = params.item ?? ''
+  const rawType = (params.type ?? '').trim().toUpperCase()
+  const typeFilter = rawType === 'ALL' ? '' : rawType
+  const itemFilter = (params.item ?? '').trim()
   const page = Math.max(1, parseInt(params.page ?? '1', 10))
   const pageSize = 25
 
@@ -45,13 +44,23 @@ export default async function ReportsPage({
   const safeTo = /^\d{4}-\d{2}-\d{2}$/.test(dateTo) ? dateTo : nowWib
 
   // Convert WIB dates to UTC range for DB queries
-  // Asia/Jakarta = UTC+7, so 2024-01-01 WIB = 2023-12-31T17:00:00Z
   const fromUtc = `${safeFrom}T00:00:00+07:00`
   const toUtc = `${safeTo}T23:59:59+07:00`
 
-  // ── Summary stats ────────────────────────────────────────────────────────────
+  // Helper to apply type filter to query
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const applyTypeFilter = (queryBuilder: any, type?: string) => {
+    if (!type || type === 'ALL') return queryBuilder
+    if (type === 'ADJUSTMENT') {
+      return queryBuilder.in('transaction_type', ['ADJUSTMENT_IN', 'ADJUSTMENT_OUT'])
+    }
+    if (['IN', 'OUT', 'INITIAL', 'ADJUSTMENT_IN', 'ADJUSTMENT_OUT', 'REVERSAL'].includes(type)) {
+      return queryBuilder.eq('transaction_type', type)
+    }
+    return queryBuilder
+  }
 
-  const validTypes = ['IN', 'OUT', 'INITIAL', 'ADJUSTMENT_IN', 'ADJUSTMENT_OUT', 'REVERSAL']
+  // ── Summary stats ────────────────────────────────────────────────────────────
 
   let summaryQuery = supabase
     .from('stock_transactions')
@@ -59,9 +68,8 @@ export default async function ReportsPage({
     .gte('transaction_at', fromUtc)
     .lte('transaction_at', toUtc)
 
-  if (typeFilter && validTypes.includes(typeFilter)) {
-    summaryQuery = summaryQuery.eq('transaction_type', typeFilter as TransactionType)
-  }
+  summaryQuery = applyTypeFilter(summaryQuery, typeFilter)
+
   if (itemFilter) {
     summaryQuery = summaryQuery.eq('item_id', itemFilter)
   }
@@ -81,9 +89,8 @@ export default async function ReportsPage({
     .order('transaction_at', { ascending: false })
     .range((page - 1) * pageSize, page * pageSize - 1)
 
-  if (typeFilter && validTypes.includes(typeFilter)) {
-    txQuery = txQuery.eq('transaction_type', typeFilter as TransactionType)
-  }
+  txQuery = applyTypeFilter(txQuery, typeFilter)
+
   if (itemFilter) {
     txQuery = txQuery.eq('item_id', itemFilter)
   }
@@ -92,15 +99,17 @@ export default async function ReportsPage({
 
   // ── Low stock items ──────────────────────────────────────────────────────────
 
-  const { data: lowStockItems, error: lowStockError } = await supabase
+  const { data: allActiveItems, error: lowStockError } = await supabase
     .from('items')
     .select('id,sku,name,current_stock,minimum_stock,base_unit:units!base_unit_id(id,name,symbol)')
     .eq('is_active', true)
-    .filter('current_stock', 'lte', 'minimum_stock')
     .order('current_stock', { ascending: true })
-    .limit(20)
 
-  // Compute summary
+  const lowStockItems = (allActiveItems ?? [])
+    .filter((item) => Number(item.current_stock) <= Number(item.minimum_stock))
+    .slice(0, 20)
+
+  // Compute summary (totalIn = sum of positive deltas, totalOut = sum of negative deltas as abs)
   const summary = {
     totalIn: 0,
     totalOut: 0,
@@ -112,14 +121,17 @@ export default async function ReportsPage({
   }
 
   for (const tx of summaryData ?? []) {
-    if (tx.transaction_type === 'IN' || tx.transaction_type === 'INITIAL') {
-      summary.totalIn += tx.base_quantity
-    } else if (tx.transaction_type === 'OUT') {
-      summary.totalOut += Math.abs(tx.base_quantity)
-    } else if (tx.transaction_type === 'ADJUSTMENT_IN') {
-      summary.totalAdjustmentIn += tx.base_quantity
+    const delta = Number(tx.quantity_delta ?? 0)
+    if (delta > 0) {
+      summary.totalIn += delta
+    } else if (delta < 0) {
+      summary.totalOut += Math.abs(delta)
+    }
+
+    if (tx.transaction_type === 'ADJUSTMENT_IN') {
+      summary.totalAdjustmentIn += delta
     } else if (tx.transaction_type === 'ADJUSTMENT_OUT') {
-      summary.totalAdjustmentOut += Math.abs(tx.base_quantity)
+      summary.totalAdjustmentOut += Math.abs(delta)
     } else if (tx.transaction_type === 'REVERSAL') {
       summary.totalReversal++
     }

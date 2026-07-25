@@ -2,10 +2,11 @@
 
 /**
  * AdjustmentForm — physical stock count adjustment UI.
- * Follows the exact flow from spec section 13.
+ * Redesigned with responsive desktop grid, unified card, and compact recent history.
  */
 
 import { useState, useTransition, useRef } from 'react'
+import Link from 'next/link'
 import ItemSearchInput from '@/components/item-search-input'
 import { processAdjustment } from './actions'
 
@@ -33,7 +34,11 @@ interface SelectedItem {
   item_units: never[]
 }
 
-const dtf = new Intl.DateTimeFormat('id-ID', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Jakarta' })
+const dtf = new Intl.DateTimeFormat('id-ID', {
+  dateStyle: 'medium',
+  timeStyle: 'short',
+  timeZone: 'Asia/Jakarta',
+})
 
 export default function AdjustmentForm({ recentAdjustments }: { recentAdjustments: AdjTx[] }) {
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null)
@@ -85,42 +90,50 @@ export default function AdjustmentForm({ recentAdjustments }: { recentAdjustment
   }
 
   return (
-    <div className="grid gap-8 lg:grid-cols-2">
-      {/* Form */}
-      <div>
+    <div className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(380px,420px)] xl:items-start">
+      {/* Column 1: Main Adjustment Form Card */}
+      <div className="min-w-0 space-y-4">
         {message && (
-          <div role="alert" className={message.type === 'success' ? 'alert-success mb-4' : 'alert-error mb-4'}>
+          <div role="alert" className={message.type === 'success' ? 'alert-success' : 'alert-error'}>
             {message.text}
           </div>
         )}
 
-        <div className="card space-y-4">
+        <div className="card p-6 space-y-6 min-w-0">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 border-b border-slate-200 dark:border-white/10 pb-3">
+            Formulir Penyesuaian Stok
+          </h2>
+
           {/* Item selection */}
-          <div>
-            <label className="label mb-1">Barang <span className="text-red-500">*</span></label>
+          <div className="min-w-0">
+            <label className="label mb-1.5">
+              Barang <span className="text-red-500">*</span>
+            </label>
             <ItemSearchInput
               onSelect={(item) => {
                 setSelectedItem(item as unknown as SelectedItem)
                 setPhysicalStock('')
                 requestIdRef.current = crypto.randomUUID()
               }}
-              placeholder="Cari barang aktif…"
+              placeholder="Cari barang aktif berdasarkan nama, SKU, atau barcode…"
               preselected={selectedItem ? { id: selectedItem.id, name: selectedItem.name, sku: selectedItem.sku } : null}
             />
           </div>
 
           {selectedItem && (
             <>
-              <div className="rounded-md bg-blue-50 p-3 text-sm">
-                <p className="font-medium text-blue-800">{selectedItem.name}</p>
-                <p className="text-blue-600">
-                  Stok sistem: <strong>{Number(selectedItem.current_stock).toLocaleString('id-ID')}</strong>{' '}
-                  {selectedItem.base_unit?.symbol}
-                </p>
+              {/* Selected Item Details */}
+              <div className="rounded-lg bg-blue-50 dark:bg-[#22D3EE]/10 border border-blue-200 dark:border-[#22D3EE]/30 p-4 space-y-1.5 min-w-0">
+                <p className="text-base font-semibold text-blue-900 dark:text-[#22D3EE] break-words">{selectedItem.name}</p>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-blue-700 dark:text-[#22D3EE]/90">
+                  <span className="break-all">SKU: <code className="font-mono">{selectedItem.sku}</code></span>
+                  <span>Stok sistem: <strong className="font-bold">{Number(selectedItem.current_stock).toLocaleString('id-ID')}</strong> {selectedItem.base_unit?.symbol}</span>
+                </div>
               </div>
 
-              <div>
-                <label htmlFor="adj-physical-stock" className="label mb-1">
+              {/* Physical Stock Input */}
+              <div className="min-w-0">
+                <label htmlFor="adj-physical-stock" className="label mb-1.5">
                   Stok Fisik ({selectedItem.base_unit?.symbol}) <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -130,29 +143,37 @@ export default function AdjustmentForm({ recentAdjustments }: { recentAdjustment
                   step={1}
                   value={physicalStock}
                   onChange={(e) => setPhysicalStock(e.target.value)}
-                  className="input"
-                  placeholder="Masukkan jumlah stok fisik"
+                  className="input w-full"
+                  placeholder="Masukkan jumlah stok fisik hasil opname"
                 />
               </div>
 
+              {/* Delta Summary Box */}
               {delta !== null && physicalStock !== '' && (
-                <div className={`rounded-md p-3 text-sm ${
-                  delta === 0
-                    ? 'bg-slate-50 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                    : delta > 0
-                      ? 'bg-green-50 text-green-700 dark:bg-green-950/40 dark:text-green-300'
-                      : 'bg-red-50 text-red-700 dark:bg-red-950/40 dark:text-red-300'
-                }`}>
-                  Selisih: {delta > 0 ? '+' : ''}{delta.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}
-                  {delta === 0 && ' — tidak ada perubahan'}
-                  {delta > 0 && ' — akan membuat ADJUSTMENT_IN'}
-                  {delta < 0 && ' — akan membuat ADJUSTMENT_OUT'}
+                <div
+                  className={`rounded-lg p-4 text-sm border font-medium transition-colors min-w-0 break-words ${
+                    delta === 0
+                      ? 'bg-slate-50 text-slate-600 border-slate-200 dark:bg-[#0B1220] dark:text-slate-300 dark:border-white/10'
+                      : delta > 0
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/50'
+                        : 'bg-red-50 text-red-800 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/50'
+                  }`}
+                >
+                  <p className="font-bold text-base mb-0.5">
+                    Selisih: {delta > 0 ? '+' : ''}{delta.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}
+                  </p>
+                  <p className="text-xs font-normal opacity-90">
+                    {delta === 0 && 'Stok fisik sama dengan stok sistem. Tidak ada perubahan yang dibuat.'}
+                    {delta > 0 && 'Stok fisik lebih banyak. Sistem akan mencatat transaksi Penyesuaian Masuk (ADJUSTMENT_IN).'}
+                    {delta < 0 && 'Stok fisik lebih sedikit. Sistem akan mencatat transaksi Penyesuaian Keluar (ADJUSTMENT_OUT).'}
+                  </p>
                 </div>
               )}
 
-              <div>
-                <label htmlFor="adj-reason" className="label mb-1">
-                  Alasan <span className="text-red-500">*</span>
+              {/* Reason Input */}
+              <div className="min-w-0">
+                <label htmlFor="adj-reason" className="label mb-1.5">
+                  Alasan Penyesuaian <span className="text-red-500">*</span>
                 </label>
                 <textarea
                   id="adj-reason"
@@ -160,15 +181,16 @@ export default function AdjustmentForm({ recentAdjustments }: { recentAdjustment
                   maxLength={500}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
-                  placeholder="Contoh: Hasil opname fisik tanggal 20 Juli 2026"
-                  className="input"
+                  placeholder="Contoh: Hasil stok opname bulanan atau koreksi barang rusak..."
+                  className="input w-full"
                 />
               </div>
 
+              {/* Submit Button */}
               <button
                 id="btn-konfirmasi-penyesuaian"
                 type="button"
-                className="btn-primary w-full"
+                className="btn-primary w-full disabled:bg-slate-200 dark:disabled:bg-[#203552] disabled:text-slate-400 dark:disabled:text-[#8494ab] disabled:opacity-100"
                 disabled={isPending || !physicalStock || !reason.trim() || delta === 0}
                 onClick={() => setShowConfirm(true)}
               >
@@ -179,52 +201,105 @@ export default function AdjustmentForm({ recentAdjustments }: { recentAdjustment
         </div>
       </div>
 
-      {/* Recent adjustments */}
-      <div>
-        <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">Penyesuaian Terbaru</h2>
-        {recentAdjustments.length === 0 ? (
-          <p className="text-sm text-slate-500 dark:text-slate-400">Belum ada penyesuaian.</p>
-        ) : (
-          <div className="space-y-2">
-            {recentAdjustments.map((adj) => {
-              const delta = Number(adj.quantity_delta)
-              return (
-                <div key={adj.id} className="card text-sm">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <code className="code-chip">{adj.transaction_number}</code>
-                      <p className="font-medium text-slate-900 dark:text-slate-100">{adj.items?.name ?? '—'}</p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">{adj.reason ?? '—'}</p>
-                    </div>
-                    <div className="text-right">
-                      <span className={delta >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                        {delta >= 0 ? '+' : ''}{delta.toLocaleString('id-ID')}
-                      </span>
-                      <p className="text-xs text-slate-400 dark:text-slate-500">{dtf.format(new Date(adj.transaction_at))}</p>
+      {/* Column 2: Side Column — Penyesuaian Terbaru (Max 5 items, max-w 420px) */}
+      <div className="min-w-0">
+        <div className="card p-6 space-y-4 min-w-0">
+          <div className="flex items-center justify-between border-b border-slate-200 dark:border-white/10 pb-3">
+            <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
+              Penyesuaian Terbaru
+            </h2>
+            <Link
+              href="/admin/reports?type=ADJUSTMENT"
+              className="text-xs font-medium text-blue-600 dark:text-[#22D3EE] hover:underline"
+            >
+              Lihat semua →
+            </Link>
+          </div>
+
+          {recentAdjustments.length === 0 ? (
+            <p className="text-sm text-slate-500 dark:text-slate-400 py-6 text-center">
+              Belum ada penyesuaian stok.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {recentAdjustments.slice(0, 5).map((adj) => {
+                const qDelta = Number(adj.quantity_delta)
+                return (
+                  <div
+                    key={adj.id}
+                    className="rounded-lg border border-slate-200 dark:border-white/10 p-3.5 text-sm bg-slate-50/50 dark:bg-[#0B1220]/50 hover:bg-slate-100/50 dark:hover:bg-[#203552]/30 transition-colors min-w-0"
+                  >
+                    <div className="flex items-start justify-between gap-3 min-w-0">
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <code className="code-chip text-[11px]">{adj.transaction_number}</code>
+                        </div>
+                        <p className="font-semibold text-slate-900 dark:text-slate-100 break-words">
+                          {adj.items?.name ?? '—'}
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 break-words">
+                          {adj.reason ?? '—'}
+                        </p>
+                      </div>
+
+                      <div className="shrink-0 text-right space-y-1">
+                        <span
+                          className={`inline-flex rounded-md px-2 py-0.5 text-xs font-bold whitespace-nowrap ${
+                            qDelta >= 0
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300'
+                          }`}
+                        >
+                          {qDelta >= 0 ? '+' : ''}{qDelta.toLocaleString('id-ID')} {adj.units?.symbol}
+                        </span>
+                        <p className="text-[11px] text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                          {dtf.format(new Date(adj.transaction_at))}
+                        </p>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
+                )
+              })}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Confirm dialog */}
+      {/* Confirm modal dialog */}
       {showConfirm && selectedItem && delta !== null && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" role="dialog" aria-modal="true">
-          <div className="mx-4 w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-slate-800">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">Konfirmasi Penyesuaian</h2>
-            <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-300">
-              <p><span className="font-medium">Barang:</span> {selectedItem.name}</p>
-              <p><span className="font-medium">Stok sistem:</span> {Number(selectedItem.current_stock).toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
-              <p><span className="font-medium">Stok fisik:</span> {physicalNum?.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
-              <p><span className="font-medium">Selisih:</span> <span className={delta >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>{delta >= 0 ? '+' : ''}{delta.toLocaleString('id-ID')}</span></p>
-              <p><span className="font-medium">Alasan:</span> {reason}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" role="dialog" aria-modal="true">
+          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl dark:bg-[#17263D] border border-slate-200 dark:border-white/10 space-y-4">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+              Konfirmasi Penyesuaian Stok
+            </h2>
+            <div className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
+              <p><span className="font-medium text-slate-900 dark:text-white">Barang:</span> <span className="break-words">{selectedItem.name}</span></p>
+              <p><span className="font-medium text-slate-900 dark:text-white">Stok sistem:</span> {Number(selectedItem.current_stock).toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
+              <p><span className="font-medium text-slate-900 dark:text-white">Stok fisik:</span> {physicalNum?.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
+              <p>
+                <span className="font-medium text-slate-900 dark:text-white">Selisih:</span>{' '}
+                <strong className={delta >= 0 ? 'text-emerald-600 dark:text-emerald-400 font-bold' : 'text-red-600 dark:text-red-400 font-bold'}>
+                  {delta >= 0 ? '+' : ''}{delta.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}
+                </strong>
+              </p>
+              <p><span className="font-medium text-slate-900 dark:text-white">Alasan:</span> <span className="break-words">{reason}</span></p>
             </div>
-            <div className="mt-5 flex justify-end gap-3">
-              <button type="button" className="btn-secondary" onClick={() => setShowConfirm(false)} disabled={isPending}>Batal</button>
-              <button id="btn-konfirmasi-ok" type="button" className="btn-primary" onClick={handleConfirm} disabled={isPending}>
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                type="button"
+                className="btn-secondary text-sm"
+                onClick={() => setShowConfirm(false)}
+                disabled={isPending}
+              >
+                Batal
+              </button>
+              <button
+                id="btn-konfirmasi-ok"
+                type="button"
+                className="btn-primary text-sm"
+                onClick={handleConfirm}
+                disabled={isPending}
+              >
                 {isPending ? 'Menyimpan…' : 'Ya, Simpan'}
               </button>
             </div>
@@ -234,3 +309,4 @@ export default function AdjustmentForm({ recentAdjustments }: { recentAdjustment
     </div>
   )
 }
+
