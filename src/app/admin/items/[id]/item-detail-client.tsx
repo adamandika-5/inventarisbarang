@@ -105,7 +105,10 @@ export default function ItemDetailClient({
     <div className="mx-auto max-w-3xl">
       {/* Back link */}
       <div className="mb-4">
-        <Link href="/admin/items" className="text-sm text-blue-600 hover:underline">
+        <Link
+          href="/admin/items"
+          className="text-sm font-medium text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 hover:underline"
+        >
           &larr; Kembali ke Daftar Barang
         </Link>
       </div>
@@ -130,19 +133,22 @@ export default function ItemDetailClient({
           ) : (
             <span className="badge-nonaktif">Nonaktif</span>
           )}
-          <span className="text-sm text-slate-500 dark:text-slate-400">
+          <span className="text-sm font-medium text-slate-500 dark:text-slate-400">
             Stok: {stockNum.toLocaleString('id-ID')} {item.base_unit?.symbol ?? ''}
           </span>
         </div>
         <div className="flex gap-2">
-          <Link href={`/admin/stock-in?item=${item.id}`} className="btn-secondary text-sm">
+          <Link
+            href={`/admin/stock-in?item=${item.id}`}
+            className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors"
+          >
             + Barang Masuk
           </Link>
           {!isEditing && (
             <button
               type="button"
               id="btn-edit-barang"
-              className="btn-primary text-sm"
+              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
               onClick={() => setIsEditing(true)}
               disabled={isPending}
             >
@@ -164,7 +170,7 @@ export default function ItemDetailClient({
             <button
               type="button"
               id="btn-aktifkan-barang"
-              className="btn-primary text-sm"
+              className="rounded-md bg-blue-600 px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
               onClick={handleActivate}
               disabled={isPending}
             >
@@ -176,7 +182,7 @@ export default function ItemDetailClient({
 
       {/* Detail / Edit */}
       {isEditing ? (
-        <form action={handleUpdate} className="card space-y-4">
+        <form action={handleUpdate} className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900 space-y-4">
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">Edit Barang</h2>
 
           <div>
@@ -224,16 +230,16 @@ export default function ItemDetailClient({
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
-            <button type="button" className="btn-secondary" onClick={() => setIsEditing(false)} disabled={isPending}>
+            <button type="button" className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700 transition-colors" onClick={() => setIsEditing(false)} disabled={isPending}>
               Batal
             </button>
-            <button type="submit" id="btn-simpan-edit-barang" className="btn-primary" disabled={isPending}>
+            <button type="submit" id="btn-simpan-edit-barang" className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors" disabled={isPending}>
               {isPending ? 'Menyimpan…' : 'Simpan Perubahan'}
             </button>
           </div>
         </form>
       ) : (
-        <div className="card">
+        <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-700 dark:bg-slate-900">
           <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {[
               ['Nama Barang', item.name],
@@ -249,16 +255,16 @@ export default function ItemDetailClient({
             ].map(([label, value]) => (
               <div key={String(label)}>
                 <dt className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</dt>
-                <dd className="mt-1 text-sm text-slate-900 dark:text-slate-100">{value}</dd>
+                <dd className="mt-1 text-sm font-medium text-slate-900 dark:text-slate-100">{value}</dd>
               </div>
             ))}
           </dl>
 
           {/* Alternate units */}
           {item.item_units.length > 0 && (
-            <div className="mt-6">
-              <h3 className="mb-2 text-sm font-semibold text-slate-700 dark:text-slate-300">Satuan Alternatif</h3>
-              <div className="overflow-x-auto rounded border border-slate-200 dark:border-slate-700">
+            <div className="mt-6 border-t border-slate-200 pt-6 dark:border-slate-700">
+              <h3 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Satuan Alternatif</h3>
+              <div className="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
                 <table className="table">
                   <thead>
                     <tr>

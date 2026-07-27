@@ -1,5 +1,3 @@
-import fs from 'fs'
-import path from 'path'
 import { describe, it, expect } from 'vitest'
 import ExcelJS from 'exceljs'
 import {
@@ -250,57 +248,61 @@ describe('Inventory Summary Report Excel Generation & Verification', () => {
     const readerWorkbook = new ExcelJS.Workbook()
     await readerWorkbook.xlsx.load(buffer as unknown as ExcelJS.Buffer)
 
-    // Check sheet 1: Ringkasan
-    const wsRingkasan = readerWorkbook.getWorksheet('Ringkasan')
-    expect(wsRingkasan).toBeDefined()
-    expect(wsRingkasan?.getCell('A1').value).toBe('BPS KOTA MOJOKERTO')
+    // 1. Verify Workbook has ONLY 1 sheet: "Riwayat Transaksi"
+    expect(readerWorkbook.worksheets.map((w) => w.name)).toEqual(['Riwayat Transaksi'])
+    expect(readerWorkbook.getWorksheet('Ringkasan')).toBeUndefined()
+    expect(readerWorkbook.getWorksheet('Detail Audit')).toBeUndefined()
 
-    // Check sheet 2: Riwayat Transaksi (20 columns)
     const wsRiwayat = readerWorkbook.getWorksheet('Riwayat Transaksi')
     expect(wsRiwayat).toBeDefined()
     if (!wsRiwayat) return
 
-    // Row 6: tx-1 (Barang Masuk 10 pcs @ Rp4.000 = Rp40.000)
-    const mutasiMasukQtyCell1 = wsRiwayat.getCell('I6')
-    expect(mutasiMasukQtyCell1.value).toBe(10)
+    // 2. Verify Headers A5:N5 are all filled
+    const headersExpected = [
+      'No.',
+      'Tanggal dan Waktu (WIB)',
+      'Nomor Transaksi',
+      'Jenis Transaksi',
+      'Kode Barang',
+      'Nama Barang',
+      'Kategori',
+      'Jumlah Mutasi',
+      'Satuan',
+      'Stok Setelah',
+      'Harga Satuan',
+      'Nilai Mutasi',
+      'Petugas',
+      'Keterangan',
+    ]
 
-    const mutasiMasukValCell1 = wsRiwayat.getCell('J6')
-    expect(typeof mutasiMasukValCell1.value).toBe('number')
-    expect(mutasiMasukValCell1.value).toBe(40000)
-
-    const hargaHistorisCell1 = wsRiwayat.getCell('N6')
-    expect(typeof hargaHistorisCell1.value).toBe('number')
-    expect(hargaHistorisCell1.value).toBe(4000)
-
-    // Row 7: tx-2 (Barang Keluar 5 pcs @ Rp4.000 = Rp20.000)
-    const mutasiKeluarQtyCell2 = wsRiwayat.getCell('K7')
-    expect(mutasiKeluarQtyCell2.value).toBe(5)
-
-    const mutasiKeluarValCell2 = wsRiwayat.getCell('L7')
-    expect(typeof mutasiKeluarValCell2.value).toBe('number')
-    expect(mutasiKeluarValCell2.value).toBe(20000)
-
-    const hargaHistorisCell2 = wsRiwayat.getCell('N7')
-    expect(typeof hargaHistorisCell2.value).toBe('number')
-    expect(hargaHistorisCell2.value).toBe(4000)
-
-    // Check sheet 3: Detail Audit
-    const wsAudit = readerWorkbook.getWorksheet('Detail Audit')
-    expect(wsAudit).toBeDefined()
-    if (wsAudit) {
-      const statusHargaCell1 = wsAudit.getCell('R6')
-      expect(statusHargaCell1.value).toBe('SNAPSHOT_AVAILABLE')
+    for (let c = 1; c <= 14; c++) {
+      const headerCell = wsRiwayat.getRow(5).getCell(c)
+      expect(headerCell.value).toBe(headersExpected[c - 1])
     }
 
-    // Save actual file to scratch for verification
-    const scratchDir = 'C:\\Users\\Asus\\.gemini\\antigravity-ide\\brain\\553d1121-acdb-47d6-904f-8c323c738582\\scratch'
-    if (!fs.existsSync(scratchDir)) {
-      fs.mkdirSync(scratchDir, { recursive: true })
-    }
-    const samplePath = path.join(scratchDir, 'riwayat-transaksi-2026-07-01-sampai-2026-07-23.xlsx')
-    fs.writeFileSync(samplePath, buffer)
-    const stats = fs.statSync(samplePath)
-    console.warn(`[ACTUAL_EXPORT] File: ${path.basename(samplePath)}, Size: ${stats.size} bytes (${(stats.size / 1024).toFixed(2)} KB)`)
+    // 3. Row 6: tx-1 (Barang Masuk 10 pcs @ Rp4.000 = Rp40.000)
+    const qtyMutasiCell1 = wsRiwayat.getCell('H6')
+    expect(qtyMutasiCell1.value).toBe(10)
+
+    const hargaSatuanCell1 = wsRiwayat.getCell('K6')
+    expect(typeof hargaSatuanCell1.value).toBe('number')
+    expect(hargaSatuanCell1.value).toBe(4000)
+
+    const nilaiMutasiCell1 = wsRiwayat.getCell('L6')
+    expect(typeof nilaiMutasiCell1.value).toBe('number')
+    expect(nilaiMutasiCell1.value).toBe(40000)
+
+    // 4. Row 7: tx-2 (Barang Keluar 5 pcs @ Rp4.000 = -Rp20.000)
+    const qtyMutasiCell2 = wsRiwayat.getCell('H7')
+    expect(qtyMutasiCell2.value).toBe(-5)
+
+    const hargaSatuanCell2 = wsRiwayat.getCell('K7')
+    expect(typeof hargaSatuanCell2.value).toBe('number')
+    expect(hargaSatuanCell2.value).toBe(4000)
+
+    const nilaiMutasiCell2 = wsRiwayat.getCell('L7')
+    expect(typeof nilaiMutasiCell2.value).toBe('number')
+    expect(nilaiMutasiCell2.value).toBe(-20000)
   })
 
   it('throws an explicit error when Migration 008 RPC is missing', async () => {
@@ -394,10 +396,10 @@ describe('Inventory Summary Report Excel Generation & Verification', () => {
     const wsRiwayat = readerWorkbook.getWorksheet('Riwayat Transaksi')
     expect(wsRiwayat).toBeDefined()
     if (wsRiwayat) {
-      const hargaHistorisCell = wsRiwayat.getCell('N6')
-      expect(hargaHistorisCell.value).toBe('—')
-      const statusHargaCell = wsRiwayat.getCell('T6')
-      expect(statusHargaCell.value).toBe('Belum Tersedia')
+      const hargaSatuanCell = wsRiwayat.getCell('K6')
+      expect(hargaSatuanCell.value).toBe('—')
+      const nilaiMutasiCell = wsRiwayat.getCell('L6')
+      expect(nilaiMutasiCell.value).toBe('—')
     }
   })
 

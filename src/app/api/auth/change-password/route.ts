@@ -3,12 +3,12 @@
  *
  * SECURITY:
  * - Validates current session
+ * - Verifies user active status and profile role
  * - Verifies current password using signInWithPassword (re-authentication)
  * - Validates new password strength (min 10 characters)
  * - Updates password in Supabase Auth
- * - Clears must_change_password flag via complete_forced_password_change RPC
- * - Does NOT return success if RPC fails
- * - Returns target redirect route based on user role (/admin or /employee)
+ * - Calls complete_forced_password_change RPC ONLY if must_change_password was previously true
+ * - Returns target redirect route based on mode and user role
  * - Never logs passwords, tokens, or internal emails
  */
 import { createSupabaseServerClient } from '@/lib/supabase/server'
@@ -17,7 +17,10 @@ import { z } from 'zod'
 
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Kata sandi saat ini wajib diisi.'),
-  newPassword: z.string().min(10, 'Kata sandi baru minimal 10 karakter.').max(128, 'Kata sandi baru terlalu panjang.'),
+  newPassword: z
+    .string()
+    .min(10, 'Kata sandi baru minimal 10 karakter.')
+    .max(128, 'Kata sandi baru terlalu panjang.'),
 })
 
 export async function POST(request: NextRequest) {
@@ -26,7 +29,8 @@ export async function POST(request: NextRequest) {
     const parsed = changePasswordSchema.safeParse(body)
 
     if (!parsed.success) {
-      const firstError = parsed.error.issues[0]?.message ?? 'Kata sandi tidak memenuhi persyaratan.'
+      const firstError =
+        parsed.error.issues[0]?.message ?? 'Kata sandi tidak memenuhi persyaratan.'
       return NextResponse.json({ error: firstError }, { status: 400 })
     }
 
@@ -43,7 +47,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Sesi tidak valid. Silakan login kembali.' }, { status: 401 })
     }
 
-    // 2. Verify current password by attempting to sign in
+    // 2. Fetch user profile role, active status, and must_change_password flag
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, is_active, must_change_password')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile || !profile.is_active) {
+      return NextResponse.json(
+        { error: 'Akun Anda telah dinonaktifkan atau tidak ditemukan.' },
+        { status: 403 },
+      )
+    }
+
+    // 3. Verify current password by attempting to sign in
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: user.email,
       password: currentPassword,
@@ -53,7 +71,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Kata sandi saat ini tidak valid.' }, { status: 400 })
     }
 
-    // 3. Update password in Supabase Auth
+    // 4. Update password in Supabase Auth
     const { error: updateError } = await supabase.auth.updateUser({
       password: newPassword,
     })
@@ -65,32 +83,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // 4. Clear must_change_password flag via SECURITY DEFINER RPC
-    const { error: rpcError } = await supabase.rpc('complete_forced_password_change')
+    // 5. Call complete_forced_password_change RPC ONLY if must_change_password was previously true
+    const wasForced = profile.must_change_password
+    if (wasForced) {
+      const { error: rpcError } = await supabase.rpc('complete_forced_password_change')
 
-    if (rpcError) {
-      // Log only error code and message — NEVER log passwords, tokens, or emails
-      console.error(`complete_forced_password_change RPC failed - code: ${rpcError.code}, message: ${rpcError.message}`)
-      
-      // Password was changed in Auth, but clearing profile flag failed.
-      // Inform user that new password is active so they use the new password when trying again.
-      return NextResponse.json(
-        {
-          error:
-            'Kata sandi baru telah berhasil disimpan, namun pembaruan status profil gagal. Silakan coba lagi dengan kata sandi baru Anda.',
-        },
-        { status: 500 },
-      )
+      if (rpcError) {
+        console.error(
+          `complete_forced_password_change RPC failed - code: ${rpcError.code}, message: ${rpcError.message}`,
+        )
+        return NextResponse.json(
+          {
+            error:
+              'Kata sandi baru telah berhasil disimpan, namun pembaruan status profil gagal. Silakan coba lagi dengan kata sandi baru Anda.',
+          },
+          { status: 500 },
+        )
+      }
     }
 
-    // 5. Fetch user profile role to determine redirect path
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single()
-
-    const redirectTo = profile?.role === 'ADMIN' ? '/admin' : '/employee'
+    // 6. Determine target redirect based on mode and role
+    // Voluntary change (wasForced === false): ADMIN -> /admin/account, EMPLOYEE -> /employee
+    // Forced change (wasForced === true): ADMIN -> /admin, EMPLOYEE -> /employee
+    let redirectTo = '/employee'
+    if (profile.role === 'ADMIN') {
+      redirectTo = wasForced ? '/admin' : '/admin/account'
+    }
 
     return NextResponse.json({ success: true, redirectTo })
   } catch {
