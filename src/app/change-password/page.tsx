@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import ChangePasswordForm from './change-password-form'
 import ThemeToggle from '@/components/theme-toggle'
+import Link from 'next/link'
 
 export const metadata: Metadata = {
   title: 'Ganti Kata Sandi — InventarisBarang',
@@ -30,10 +31,8 @@ export default async function ChangePasswordPage() {
     redirect('/login')
   }
 
-  // If user does not need to change password, redirect to appropriate dashboard
-  if (!profile.must_change_password) {
-    redirect(profile.role === 'ADMIN' ? '/admin' : '/employee')
-  }
+  const isForced = profile.must_change_password
+  const isAdmin = profile.role === 'ADMIN'
 
   return (
     <main className="relative flex min-h-screen items-center justify-center bg-slate-50 dark:bg-[#0B1220] px-4 py-12 text-slate-900 dark:text-white transition-colors">
@@ -65,9 +64,21 @@ export default async function ChangePasswordPage() {
             Ganti Kata Sandi
           </h2>
           <p className="mb-6 text-center text-sm text-slate-500 dark:text-slate-400">
-            Anda harus mengganti kata sandi sebelum melanjutkan.
+            {isForced
+              ? 'Anda harus mengganti kata sandi sebelum melanjutkan.'
+              : 'Masukkan kata sandi saat ini dan kata sandi baru Anda.'}
           </p>
           <ChangePasswordForm />
+          {!isForced && isAdmin && (
+            <div className="mt-4 text-center border-t border-slate-200 dark:border-white/10 pt-4">
+              <Link
+                href="/admin/account"
+                className="text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:underline transition-colors"
+              >
+                ← Kembali ke Akun Saya
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </main>

@@ -22,7 +22,6 @@ const navItems = [
   { label: 'Penyesuaian Stok', href: '/admin/adjustments' },
   { label: 'Koreksi Transaksi', href: '/admin/reversals' },
   { label: 'Cetak Barcode', href: '/admin/barcode-print' },
-  { label: 'Impor Excel', href: '/admin/import' },
   { label: 'Laporan', href: '/admin/reports' },
   { label: 'Pengguna', href: '/admin/users' },
   { label: 'Audit Log', href: '/admin/audit-log' },
@@ -149,7 +148,7 @@ export default function AdminMobileNav({ fullName }: AdminMobileNavProps) {
               onClick={() => setIsOpen(false)}
               className="flex-1 rounded-md border border-slate-300 dark:border-white/20 px-3 py-2 text-center text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-[#203552]"
             >
-              Akun
+              Akun Saya
             </Link>
             <button
               type="button"

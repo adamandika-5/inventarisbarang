@@ -35,9 +35,11 @@ export default async function ItemDetailPage({
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Detail Barang</h1>
-        <p className="mt-1 text-sm text-gray-500">
-          <code className="rounded bg-gray-100 px-1.5 py-0.5 text-xs font-mono">{item.sku}</code>
+        <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-50">Detail Barang</h1>
+        <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
+          <code className="inline-block rounded bg-slate-100 px-2 py-0.5 font-mono text-xs font-medium text-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:ring-1 dark:ring-slate-700">
+            {item.sku}
+          </code>
         </p>
       </div>
       <ItemDetailClient
