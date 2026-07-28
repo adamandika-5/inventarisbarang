@@ -72,12 +72,12 @@ export default function NewEmployeeForm() {
             name="password"
             autoComplete="new-password"
             required
-            minLength={10}
+            minLength={6}
             maxLength={72}
-            placeholder="Minimal 10 karakter"
+            placeholder="Minimal 6 karakter"
             className="input"
           />
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Minimal 10 karakter. Pegawai harus mengganti password ini saat pertama login.</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Minimal 6 karakter. Pegawai harus mengganti password ini saat pertama login.</p>
         </div>
 
         <div className="rounded-md bg-blue-50 p-3 text-xs text-blue-700 dark:bg-blue-950/40 dark:text-blue-300">

@@ -147,10 +147,18 @@ export async function searchItemByCode(query: string) {
         )
       `)
       .or(`barcode.eq.${cleanQuery},sku.ilike.${cleanQuery}`)
-      .eq('is_active', true)
       .maybeSingle()
 
-    if (exactItem) return exactItem
+    if (exactItem) {
+      if (!exactItem.is_active) {
+        return {
+          item: null,
+          isInactive: true,
+          error: 'Barang ini sedang nonaktif. Hubungi admin untuk mengaktifkannya kembali.',
+        }
+      }
+      return { item: exactItem, error: null }
+    }
 
     // Partial match by name or SKU
     const { data: matchedItems } = await supabase
@@ -179,7 +187,11 @@ export async function searchItemByCode(query: string) {
       .eq('is_active', true)
       .limit(5)
 
-    return matchedItems && matchedItems.length > 0 ? matchedItems[0] : null
+    if (matchedItems && matchedItems.length > 0) {
+      return { item: matchedItems[0], error: null }
+    }
+
+    return null
   } catch {
     return null
   }

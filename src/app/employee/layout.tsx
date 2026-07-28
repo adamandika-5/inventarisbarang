@@ -16,11 +16,17 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
     redirect('/login')
   }
 
+  const profileStart = performance.now()
   const { data: profile } = await supabase
     .from('profiles')
     .select('role,is_active,must_change_password,full_name,username')
     .eq('id', user.id)
     .single()
+
+  if (process.env.NODE_ENV === 'development') {
+    // eslint-disable-next-line no-console
+    console.log(`[PERF] EmployeeLayout profile lookup: ${(performance.now() - profileStart).toFixed(2)}ms`)
+  }
 
   if (!profile || !profile.is_active) {
     redirect('/login')

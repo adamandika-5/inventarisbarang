@@ -92,7 +92,7 @@ interface ReportsClientProps {
 const TYPE_LABELS: Record<TransactionType, string> = {
   IN: 'Barang Masuk',
   OUT: 'Barang Keluar',
-  INITIAL: 'Stok Awal',
+  INITIAL: 'Stok Pembukaan',
   ADJUSTMENT_IN: 'Penyesuaian +',
   ADJUSTMENT_OUT: 'Penyesuaian −',
   REVERSAL: 'Koreksi',
@@ -305,13 +305,18 @@ export default function ReportsClient({
               className="input w-44"
             >
               <option value="ALL">Semua Jenis</option>
-              <option value="INITIAL">Stok Awal</option>
+              <option value="INITIAL">Stok Pembukaan</option>
               <option value="IN">Barang Masuk</option>
               <option value="OUT">Barang Keluar</option>
               <option value="ADJUSTMENT">Penyesuaian</option>
               <option value="REVERSAL">Koreksi</option>
             </select>
           </div>
+          {localType === 'INITIAL' && (
+            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+              Stok yang pertama kali dicatat ketika barang mulai digunakan dalam sistem.
+            </p>
+          )}
           <div className="flex gap-2">
             <button
               type="submit"
@@ -424,7 +429,7 @@ export default function ReportsClient({
               <table className="table min-w-[1100px]">
                 <thead>
                   <tr>
-                    <th>No. Transaksi</th>
+                    <th className="min-w-[180px] whitespace-nowrap">No. Transaksi</th>
                     <th>Tanggal (WIB)</th>
                     <th>Jenis</th>
                     <th>Barang</th>
@@ -437,7 +442,9 @@ export default function ReportsClient({
                 <tbody>
                   {transactions.map((tx) => (
                     <tr key={tx.id} className={tx.is_reversed ? 'opacity-50' : ''}>
-                      <td className="font-mono text-xs"><span className="code-chip">{tx.transaction_number}</span></td>
+                      <td className="min-w-[180px] whitespace-nowrap font-mono text-xs">
+                        <span className="code-chip inline-block whitespace-nowrap">{tx.transaction_number}</span>
+                      </td>
                       <td className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
                         {formatWib(tx.transaction_at)}
                       </td>

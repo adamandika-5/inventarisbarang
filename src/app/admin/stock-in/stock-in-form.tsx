@@ -243,7 +243,7 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
                   onChange={handleUnitChange}
                   value={selectedUnit?.id ?? ''}
                 >
-                  <option value="">— Pilih Satuan —</option>
+                  <option value="">Pilih Satuan</option>
                   {getAvailableUnits().map((u) => (
                     <option key={u.id} value={u.id}>
                       {u.name} ({u.symbol}) — faktor: {u.conversion_factor}

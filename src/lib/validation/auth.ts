@@ -44,7 +44,7 @@ export function validateUsername(username: string): string | null {
 
 /**
  * Validate password strength.
- * Minimum 10 characters as per spec.
+ * Minimum 6 characters.
  * Returns null if valid, error message if invalid.
  *
  * TODO(security): Consider integrating leaked password detection (e.g., HaveIBeenPwned API)
@@ -55,8 +55,8 @@ export function validatePassword(password: string): string | null {
     return 'Kata sandi wajib diisi.'
   }
 
-  if (password.length < 10) {
-    return 'Kata sandi minimal 10 karakter.'
+  if (password.length < 6) {
+    return 'Kata sandi minimal 6 karakter.'
   }
 
   if (password.length > 128) {

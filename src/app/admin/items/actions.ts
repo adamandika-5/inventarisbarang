@@ -12,9 +12,56 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { validateBarcodeFormat } from '@/lib/validation/barcode'
+import { validateBarcodeFormat, generateAutoBarcodePattern } from '@/lib/validation/barcode'
+import { createAuditLog } from '@/lib/audit'
 
 const barcodeFormatValues = ['EAN13', 'EAN8', 'UPCA', 'UPCE', 'CODE128', 'QR'] as const
+
+export interface GenerateBarcodeResult {
+  success: boolean
+  barcode?: string
+  error?: string
+}
+
+/**
+ * Generate a unique auto barcode (IB-XXXXXX) for Code 128 format.
+ * Checks DB for collisions and retries up to 10 attempts.
+ * SECURITY: Server-side check only; does NOT mutate or insert into database.
+ */
+export async function generateAutoBarcode(): Promise<GenerateBarcodeResult> {
+  try {
+    const { supabase, isAdmin } = await verifyAdmin()
+    if (!isAdmin) {
+      return { success: false, error: 'Akses ditolak.' }
+    }
+
+    const MAX_ATTEMPTS = 10
+    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
+      const code = generateAutoBarcodePattern()
+
+      const { data: existing, error } = await supabase
+        .from('items')
+        .select('id')
+        .eq('barcode', code)
+        .limit(1)
+
+      if (error) {
+        return { success: false, error: 'Gagal memeriksa keunikan barcode di database.' }
+      }
+
+      if (!existing || existing.length === 0) {
+        return { success: true, barcode: code }
+      }
+    }
+
+    return {
+      success: false,
+      error: 'Gagal membuat barcode unik setelah beberapa percobaan. Silakan coba lagi.',
+    }
+  } catch {
+    return { success: false, error: 'Terjadi kesalahan pada server saat membuat barcode.' }
+  }
+}
 
 const itemCreateSchema = z.object({
   name: z.string().min(1, 'Nama barang wajib diisi.').max(200, 'Nama barang maksimal 200 karakter.').trim(),
@@ -57,7 +104,7 @@ async function verifyAdmin() {
   const {
     data: { user },
   } = await supabase.auth.getUser()
-  if (!user) return { supabase, isAdmin: false }
+  if (!user) return { supabase, isAdmin: false, user: null }
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -68,6 +115,7 @@ async function verifyAdmin() {
   return {
     supabase,
     isAdmin: !!(profile?.is_active && profile.role === 'ADMIN'),
+    user,
   }
 }
 
@@ -98,13 +146,11 @@ export async function createItem(formData: FormData): Promise<ActionResult> {
       }
     }
 
-    // Validate barcode format if supported
     const barcodeValid = validateBarcodeFormat(parsed.data.barcode, parsed.data.barcode_format)
     if (!barcodeValid.valid) {
       return { success: false, error: barcodeValid.error ?? 'Barcode tidak valid.' }
     }
 
-    // Use SKU from form if provided, else null for auto-generation
     const customSku = (formData.get('sku') as string)?.trim() || null
     if (customSku && !/^ATK-\d{4,}$/.test(customSku)) {
       return { success: false, error: 'Format SKU harus ATK- diikuti minimal 4 digit.' }
@@ -115,7 +161,7 @@ export async function createItem(formData: FormData): Promise<ActionResult> {
       name: parsed.data.name,
       category_id: parsed.data.category_id,
       base_unit_id: parsed.data.base_unit_id,
-      default_purchase_unit_id: parsed.data.base_unit_id, // Default to base unit; can be updated
+      default_purchase_unit_id: parsed.data.base_unit_id,
       barcode: parsed.data.barcode,
       barcode_format: parsed.data.barcode_format,
       minimum_stock: parsed.data.minimum_stock,
@@ -138,10 +184,17 @@ export async function createItem(formData: FormData): Promise<ActionResult> {
       return { success: false, error: 'Gagal membuat barang.' }
     }
 
+    await createAuditLog(supabase, {
+      action: 'ITEM_CREATED',
+      entity_type: 'items',
+      entity_id: item?.id ?? null,
+      changes_summary: { name: parsed.data.name, sku: item?.sku, barcode: parsed.data.barcode },
+    })
+
     revalidatePath('/admin/items')
     return { success: true, data: { id: item?.id, sku: item?.sku } }
-  } catch {
-    return { success: false, error: 'Terjadi kesalahan pada server.' }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Terjadi kesalahan pada server.' }
   }
 }
 
@@ -194,62 +247,82 @@ export async function updateItem(id: string, formData: FormData): Promise<Action
       return { success: false, error: 'Gagal memperbarui barang.' }
     }
 
+    await createAuditLog(supabase, {
+      action: 'ITEM_UPDATED',
+      entity_type: 'items',
+      entity_id: id,
+      changes_summary: { ...parsed.data },
+    })
+
     revalidatePath('/admin/items')
     revalidatePath(`/admin/items/${id}`)
     return { success: true }
-  } catch {
-    return { success: false, error: 'Terjadi kesalahan pada server.' }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Terjadi kesalahan pada server.' }
   }
 }
 
 /**
  * Deactivate an item (admin only)
- * Only allowed when current_stock = 0
+ * Allowed for any item regardless of stock or transaction history.
+ * Atomic: status update & audit log occur in a single database RPC transaction.
  */
 export async function deactivateItem(id: string): Promise<ActionResult> {
   try {
     const { supabase, isAdmin } = await verifyAdmin()
     if (!isAdmin) return { success: false, error: 'Akses ditolak.' }
 
-    // Check stock from server — do not trust client
-    const { data: item } = await supabase
-      .from('items')
-      .select('current_stock,is_active')
-      .eq('id', id)
-      .single()
+    const { error } = await supabase.rpc('toggle_item_active', {
+      p_item_id: id,
+      p_target_is_active: false,
+    })
 
-    if (!item) return { success: false, error: 'Barang tidak ditemukan.' }
-    if (!item.is_active) return { success: false, error: 'Barang sudah nonaktif.' }
-
-    // BigInt comparison: current_stock must be 0
-    if (item.current_stock !== 0) {
-      return { success: false, error: 'Barang hanya dapat dinonaktifkan jika stok sudah nol.' }
+    if (error) {
+      if (error.message.includes('ITEM_ALREADY_INACTIVE')) {
+        return { success: false, error: 'Barang sudah nonaktif.' }
+      }
+      if (error.message.includes('ITEM_NOT_FOUND')) {
+        return { success: false, error: 'Barang tidak ditemukan.' }
+      }
+      return { success: false, error: `Gagal menonaktifkan barang: ${error.message}` }
     }
 
-    const { error } = await supabase.from('items').update({ is_active: false }).eq('id', id)
-    if (error) return { success: false, error: 'Gagal menonaktifkan barang.' }
-
     revalidatePath('/admin/items')
+    revalidatePath(`/admin/items/${id}`)
     return { success: true }
-  } catch {
-    return { success: false, error: 'Terjadi kesalahan pada server.' }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Terjadi kesalahan pada server.' }
   }
 }
 
 /**
  * Reactivate an item (admin only)
+ * Atomic: status update & audit log occur in a single database RPC transaction.
  */
 export async function activateItem(id: string): Promise<ActionResult> {
   try {
     const { supabase, isAdmin } = await verifyAdmin()
     if (!isAdmin) return { success: false, error: 'Akses ditolak.' }
 
-    const { error } = await supabase.from('items').update({ is_active: true }).eq('id', id)
-    if (error) return { success: false, error: 'Gagal mengaktifkan barang.' }
+    const { error } = await supabase.rpc('toggle_item_active', {
+      p_item_id: id,
+      p_target_is_active: true,
+    })
+
+    if (error) {
+      if (error.message.includes('ITEM_ALREADY_ACTIVE')) {
+        return { success: false, error: 'Barang sudah aktif.' }
+      }
+      if (error.message.includes('ITEM_NOT_FOUND')) {
+        return { success: false, error: 'Barang tidak ditemukan.' }
+      }
+      return { success: false, error: `Gagal mengaktifkan barang: ${error.message}` }
+    }
 
     revalidatePath('/admin/items')
+    revalidatePath(`/admin/items/${id}`)
     return { success: true }
-  } catch {
-    return { success: false, error: 'Terjadi kesalahan pada server.' }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Terjadi kesalahan pada server.' }
   }
 }

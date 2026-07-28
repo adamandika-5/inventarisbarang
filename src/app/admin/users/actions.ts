@@ -15,6 +15,7 @@
 import { createSupabaseServerClient, createSupabaseAdmin } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { createAuditLog } from '@/lib/audit'
 
 export interface ActionResult { success: boolean; error?: string }
 
@@ -44,7 +45,7 @@ export async function toggleUserActive(userId: string, currentIsActive: boolean)
 
     // Fetch target profile — prevent managing admins
     const { data: targetProfile } = await supabase
-      .from('profiles').select('role').eq('id', userId).single()
+      .from('profiles').select('role,username').eq('id', userId).single()
     if (!targetProfile) return { success: false, error: 'Pengguna tidak ditemukan.' }
     if (targetProfile.role === 'ADMIN') {
       return { success: false, error: 'Admin tidak dapat dikelola melalui antarmuka ini.' }
@@ -54,10 +55,17 @@ export async function toggleUserActive(userId: string, currentIsActive: boolean)
       .from('profiles').update({ is_active: !currentIsActive }).eq('id', userId)
     if (error) return { success: false, error: 'Gagal mengubah status pengguna.' }
 
+    await createAuditLog(supabase, {
+      action: currentIsActive ? 'USER_DEACTIVATED' : 'USER_ACTIVATED',
+      entity_type: 'profiles',
+      entity_id: userId,
+      changes_summary: { username: targetProfile.username },
+    })
+
     revalidatePath('/admin/users')
     return { success: true }
-  } catch {
-    return { success: false, error: 'Terjadi kesalahan server.' }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Terjadi kesalahan server.' }
   }
 }
 
@@ -69,7 +77,7 @@ export async function resetUserPassword(formData: FormData): Promise<ActionResul
   try {
     const schema = z.object({
       user_id: z.string().uuid(),
-      new_password: z.string().min(10, 'Password minimal 10 karakter.').max(72),
+      new_password: z.string().min(6, 'Password minimal 6 karakter.').max(72),
     })
 
     const parsed = schema.safeParse({
@@ -83,7 +91,7 @@ export async function resetUserPassword(formData: FormData): Promise<ActionResul
 
     // Verify target is not admin
     const { data: targetProfile } = await supabase
-      .from('profiles').select('role').eq('id', parsed.data.user_id).single()
+      .from('profiles').select('role,username').eq('id', parsed.data.user_id).single()
     if (!targetProfile) return { success: false, error: 'Pengguna tidak ditemukan.' }
     if (targetProfile.role === 'ADMIN') {
       return { success: false, error: 'Password admin tidak dapat direset melalui antarmuka ini.' }
@@ -101,10 +109,17 @@ export async function resetUserPassword(formData: FormData): Promise<ActionResul
       .from('profiles').update({ must_change_password: true }).eq('id', parsed.data.user_id)
     if (profileError) return { success: false, error: 'Password direset tapi gagal menandai harus ganti.' }
 
+    await createAuditLog(supabase, {
+      action: 'USER_PASSWORD_RESET',
+      entity_type: 'profiles',
+      entity_id: parsed.data.user_id,
+      changes_summary: { username: targetProfile.username },
+    })
+
     revalidatePath('/admin/users')
     return { success: true }
-  } catch {
-    return { success: false, error: 'Terjadi kesalahan server.' }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Terjadi kesalahan server.' }
   }
 }
 
@@ -132,7 +147,7 @@ export async function createEmployee(formData: FormData): Promise<ActionResult> 
             .regex(/^[a-z0-9._-]+$/, 'Username hanya boleh huruf kecil, angka, titik, underscore, atau dash.')
         ),
       full_name: z.string().min(1, 'Nama lengkap wajib diisi.').max(200).trim(),
-      password: z.string().min(10, 'Password sementara minimal 10 karakter.').max(72),
+      password: z.string().min(6, 'Password sementara minimal 6 karakter.').max(72),
     })
 
     const parsed = schema.safeParse({

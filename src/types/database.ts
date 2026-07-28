@@ -29,6 +29,7 @@ export type AuditAction =
   | 'ITEM_UPDATED'
   | 'ITEM_DEACTIVATED'
   | 'ITEM_ACTIVATED'
+  | 'ITEM_DELETED'
   | 'CATEGORY_CREATED'
   | 'CATEGORY_UPDATED'
   | 'CATEGORY_DEACTIVATED'
@@ -517,6 +518,24 @@ export type Database = {
           stock_after: number
         }
       }
+      log_audit_event: {
+        Args: {
+          p_action: AuditAction
+          p_entity_type: string
+          p_entity_id?: string | null
+          p_changes_summary?: Json | null
+          p_reason?: string | null
+          p_request_metadata?: Json | null
+        }
+        Returns: string
+      }
+      toggle_item_active: {
+        Args: {
+          p_item_id: string
+          p_target_is_active: boolean
+        }
+        Returns: Json
+      }
       // Process stock adjustment (admin)
       process_stock_adjustment: {
         Args: {
@@ -544,6 +563,18 @@ export type Database = {
           transaction_number: string
           stock_after: number
         }
+      }
+      // Retrieve item cost data for dashboard value calculation (private schema RPC)
+      get_item_costs: {
+        Args: {
+          p_item_ids?: string[] | null
+        }
+        Returns: Array<{
+          item_id: string
+          average_cost: string
+          inventory_value: string
+          updated_at: string
+        }>
       }
     }
     Enums: {

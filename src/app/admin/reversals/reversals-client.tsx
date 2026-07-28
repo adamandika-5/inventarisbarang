@@ -43,7 +43,7 @@ const TYPE_LABELS: Record<string, string> = {
   OUT: 'Barang Keluar',
   ADJUSTMENT_IN: 'Penyesuaian +',
   ADJUSTMENT_OUT: 'Penyesuaian −',
-  INITIAL: 'Stok Awal',
+  INITIAL: 'Stok Pembukaan',
 }
 
 const TYPE_CLASSES: Record<string, string> = {

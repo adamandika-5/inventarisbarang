@@ -79,15 +79,32 @@ describe('validatePassword', () => {
 
   it('returns error for empty password', () => {
     expect(validatePassword('')).not.toBeNull()
+    expect(validatePassword('')).toBe('Kata sandi wajib diisi.')
   })
 
-  it('returns error for password shorter than 10 chars', () => {
-    expect(validatePassword('short')).not.toBeNull()
-    expect(validatePassword('123456789')).not.toBeNull() // 9 chars
+  it('rejects password shorter than 6 chars (5 chars rejected)', () => {
+    expect(validatePassword('12345')).toBe('Kata sandi minimal 6 karakter.')
+    expect(validatePassword('abcde')).toBe('Kata sandi minimal 6 karakter.')
   })
 
-  it('returns null for exactly 10 chars', () => {
-    expect(validatePassword('1234567890')).toBeNull()
+  it('accepts password of 6 chars or more', () => {
+    expect(validatePassword('123456')).toBeNull()
+    expect(validatePassword('abcdef')).toBeNull()
+    expect(validatePassword('aaaaaa')).toBeNull()
+    expect(validatePassword('admin1')).toBeNull()
+  })
+
+  it('accepts numeric-only password (e.g. 123456)', () => {
+    expect(validatePassword('123456')).toBeNull()
+  })
+
+  it('accepts letters-only password (e.g. abcdef, aaaaaa)', () => {
+    expect(validatePassword('abcdef')).toBeNull()
+    expect(validatePassword('aaaaaa')).toBeNull()
+  })
+
+  it('accepts password without symbols (e.g. admin1)', () => {
+    expect(validatePassword('admin1')).toBeNull()
   })
 
   it('returns error for password longer than 128 chars', () => {
@@ -101,5 +118,25 @@ describe('validatePassword', () => {
   it('allows all character types', () => {
     expect(validatePassword('!@#$%^&*()_+')).toBeNull()
     expect(validatePassword('αβγδεζηθ12')).toBeNull() // Unicode chars
+  })
+})
+
+describe('Login Form Password Validation', () => {
+  // Login form client-side validation logic: only check non-empty
+  function validateLoginPassword(password: string): string | null {
+    return !password || password.length === 0 ? 'Kata sandi wajib diisi.' : null
+  }
+
+  it('rejects empty password on login', () => {
+    expect(validateLoginPassword('')).toBe('Kata sandi wajib diisi.')
+  })
+
+  it('accepts any non-empty password regardless of complexity or length', () => {
+    expect(validateLoginPassword('1')).toBeNull()
+    expect(validateLoginPassword('12345')).toBeNull()
+    expect(validateLoginPassword('123456')).toBeNull()
+    expect(validateLoginPassword('abcdef')).toBeNull()
+    expect(validateLoginPassword('aaaaaa')).toBeNull()
+    expect(validateLoginPassword('admin1')).toBeNull()
   })
 })

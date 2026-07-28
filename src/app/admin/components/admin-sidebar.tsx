@@ -6,7 +6,7 @@
  */
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import ThemeToggle from '@/components/theme-toggle'
 
@@ -18,12 +18,12 @@ const navItems = [
   {
     label: 'Dashboard',
     href: '/admin',
+    exact: true,
     icon: (
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
       </svg>
     ),
-    exact: true,
   },
   {
     label: 'Data Barang',
@@ -39,7 +39,7 @@ const navItems = [
     href: '/admin/categories',
     icon: (
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 11h.01M7 15h.01M11 7h8M11 11h8M11 15h8" />
       </svg>
     ),
   },
@@ -48,7 +48,7 @@ const navItems = [
     href: '/admin/stock-in',
     icon: (
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
       </svg>
     ),
   },
@@ -57,7 +57,7 @@ const navItems = [
     href: '/admin/stock-out',
     icon: (
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 13l-5 5m0 0l-5-5m5 5V6" />
       </svg>
     ),
   },
@@ -84,7 +84,7 @@ const navItems = [
     href: '/admin/barcode-print',
     icon: (
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
       </svg>
     ),
   },
@@ -93,7 +93,7 @@ const navItems = [
     href: '/admin/reports',
     icon: (
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6m4 6V7m4 10v-3M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
       </svg>
     ),
   },
@@ -129,7 +129,6 @@ const navItems = [
 
 export default function AdminSidebar({ fullName }: AdminSidebarProps) {
   const pathname = usePathname()
-  const router = useRouter()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
@@ -146,36 +145,45 @@ export default function AdminSidebar({ fullName }: AdminSidebarProps) {
     setIsLoggingOut(true)
     setErrorMsg(null)
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000)
+
     try {
-      const res = await fetch('/api/auth/logout', { method: 'POST' })
+      const res = await fetch('/api/auth/logout', {
+        method: 'POST',
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+
       if (!res.ok) {
-        throw new Error('Gagal keluar dari akun. Silakan coba lagi.')
+        const data = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(data.error || 'Gagal keluar dari akun. Silakan coba lagi.')
       }
+
       const data = (await res.json()) as { success?: boolean; error?: string }
       if (!data.success) {
         throw new Error(data.error || 'Gagal keluar dari akun. Silakan coba lagi.')
       }
-      router.replace('/login')
-      router.refresh()
+
+      // Single safe navigation replacement to clear client router cache and memory
+      window.location.replace('/login')
     } catch (err: unknown) {
+      clearTimeout(timeoutId)
       setIsLoggingOut(false)
-      const msg = err instanceof Error ? err.message : 'Gagal keluar dari akun.'
-      setErrorMsg(msg)
+      if (err instanceof Error && err.name === 'AbortError') {
+        setErrorMsg('Koneksi lambat saat keluar. Silakan coba lagi.')
+      } else {
+        const msg = err instanceof Error ? err.message : 'Gagal keluar dari akun.'
+        setErrorMsg(msg)
+      }
     }
   }
 
   return (
-    <aside className="fixed top-0 bottom-0 left-0 z-40 hidden w-72 h-dvh flex-col overflow-hidden bg-white dark:bg-[#101D31] border-r border-slate-200 dark:border-white/10 shadow-sm transition-colors lg:flex">
+    <aside className="fixed top-0 bottom-0 left-0 z-40 hidden w-64 h-dvh flex-col overflow-hidden bg-white dark:bg-[#101D31] border-r border-slate-200 dark:border-white/10 shadow-sm transition-colors lg:flex">
       {/* Brand Header */}
       <header className="flex h-16 shrink-0 items-center px-6 border-b border-slate-200 dark:border-white/10">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-blue-600 dark:bg-[#22D3EE] text-white dark:text-[#0B1220]">
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-          </div>
-          <span className="text-lg font-bold text-slate-900 dark:text-white">InventarisBarang</span>
-        </div>
+        <span className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Inventaris Barang</span>
       </header>
 
       {/* Navigation Menu */}

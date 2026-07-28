@@ -11,6 +11,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { createAuditLog } from '@/lib/audit'
 
 const categorySchema = z.object({
   name: z
@@ -58,11 +59,15 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
     const nameNormalized = parsed.data.name.toLowerCase()
 
     // Insert
-    const { error } = await supabase.from('categories').insert({
-      name: parsed.data.name,
-      name_normalized: nameNormalized,
-      is_active: true,
-    })
+    const { data: cat, error } = await supabase
+      .from('categories')
+      .insert({
+        name: parsed.data.name,
+        name_normalized: nameNormalized,
+        is_active: true,
+      })
+      .select('id')
+      .single()
 
     if (error) {
       if (error.code === '23505') {
@@ -72,10 +77,17 @@ export async function createCategory(formData: FormData): Promise<ActionResult> 
       return { success: false, error: 'Gagal membuat kategori.' }
     }
 
+    await createAuditLog(supabase, {
+      action: 'CATEGORY_CREATED',
+      entity_type: 'categories',
+      entity_id: cat?.id ?? null,
+      changes_summary: { name: parsed.data.name },
+    })
+
     revalidatePath('/admin/categories')
     return { success: true }
-  } catch {
-    return { success: false, error: 'Terjadi kesalahan pada server.' }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Terjadi kesalahan pada server.' }
   }
 }
 
@@ -126,10 +138,17 @@ export async function updateCategory(
       return { success: false, error: 'Gagal memperbarui kategori.' }
     }
 
+    await createAuditLog(supabase, {
+      action: 'CATEGORY_UPDATED',
+      entity_type: 'categories',
+      entity_id: id,
+      changes_summary: { name: parsed.data.name },
+    })
+
     revalidatePath('/admin/categories')
     return { success: true }
-  } catch {
-    return { success: false, error: 'Terjadi kesalahan pada server.' }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Terjadi kesalahan pada server.' }
   }
 }
 
@@ -183,9 +202,17 @@ export async function toggleCategoryActive(
       return { success: false, error: 'Gagal mengubah status kategori.' }
     }
 
+    if (currentIsActive) {
+      await createAuditLog(supabase, {
+        action: 'CATEGORY_DEACTIVATED',
+        entity_type: 'categories',
+        entity_id: id,
+      })
+    }
+
     revalidatePath('/admin/categories')
     return { success: true }
-  } catch {
-    return { success: false, error: 'Terjadi kesalahan pada server.' }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Terjadi kesalahan pada server.' }
   }
 }

@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from 'vitest'
 import {
   checkTrackTorchCapability,
   safeApplyTorchConstraint,
+  checkTrackFocusModeCapability,
+  safeApplyContinuousFocus,
 } from '@/app/employee/scan/scan-client'
 import scanSuccessFeedback from '@/lib/scan-success-feedback'
 
@@ -16,9 +18,13 @@ class MockMediaStreamTrack {
   stopped = false
   shouldFailConstraints = false
   hasTorchCapability = true
+  hasContinuousFocusCapability = true
 
   getCapabilities() {
-    return { torch: this.hasTorchCapability }
+    return {
+      torch: this.hasTorchCapability,
+      focusMode: this.hasContinuousFocusCapability ? ['continuous', 'auto', 'manual'] : ['auto'],
+    }
   }
 
   async applyConstraints(constraints: unknown) {
@@ -275,6 +281,66 @@ describe('Torch Constraint Error Handling & Track State Validation', () => {
     trackWithTorch.hasTorchCapability = true
 
     expect(checkTrackTorchCapability(trackWithTorch as unknown as MediaStreamTrack)).toBe(true)
+  })
+})
+
+describe('Continuous Focus Mode Handling', () => {
+  it('checkTrackFocusModeCapability returns true when continuous focus is supported', () => {
+    const track = new MockMediaStreamTrack()
+    track.hasContinuousFocusCapability = true
+    expect(checkTrackFocusModeCapability(track as unknown as MediaStreamTrack)).toBe(true)
+  })
+
+  it('checkTrackFocusModeCapability returns false when continuous focus is NOT supported', () => {
+    const track = new MockMediaStreamTrack()
+    track.hasContinuousFocusCapability = false
+    expect(checkTrackFocusModeCapability(track as unknown as MediaStreamTrack)).toBe(false)
+  })
+
+  it('applies continuous focus mode constraint when supported', async () => {
+    const track = new MockMediaStreamTrack()
+    track.hasContinuousFocusCapability = true
+    const stream = new MockMediaStream([track])
+
+    const success = await safeApplyContinuousFocus(stream as unknown as MediaStream)
+
+    expect(success).toBe(true)
+    expect(track.applyConstraintsCalledWith).toContainEqual({
+      advanced: [{ focusMode: 'continuous' }],
+    })
+  })
+
+  it('does NOT apply continuous focus mode constraint when NOT supported', async () => {
+    const track = new MockMediaStreamTrack()
+    track.hasContinuousFocusCapability = false
+    const stream = new MockMediaStream([track])
+
+    const success = await safeApplyContinuousFocus(stream as unknown as MediaStream)
+
+    expect(success).toBe(false)
+    expect(track.applyConstraintsCalledWith).toHaveLength(0)
+  })
+
+  it('ensures constraint application failure does NOT stop camera or throw error', async () => {
+    const track = new MockMediaStreamTrack()
+    track.hasContinuousFocusCapability = true
+    track.shouldFailConstraints = true
+    const stream = new MockMediaStream([track])
+
+    const success = await safeApplyContinuousFocus(stream as unknown as MediaStream)
+
+    expect(success).toBe(false)
+    expect(track.stopped).toBe(false) // Camera keeps running!
+  })
+
+  it('ensures flash (torch) remains OFF by default when camera is opened', () => {
+    const track = new MockMediaStreamTrack()
+    track.hasTorchCapability = true
+
+    // Verify torch is not auto-enabled during camera startup
+    expect(track.applyConstraintsCalledWith).not.toContainEqual({
+      advanced: [{ torch: true }],
+    })
   })
 })
 

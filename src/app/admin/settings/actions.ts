@@ -3,6 +3,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { createAuditLog } from '@/lib/audit'
 
 const settingsSchema = z.object({
   institution_name: z.string().max(200).trim().optional(),
@@ -123,25 +124,12 @@ export async function saveSettings(formData: FormData): Promise<ActionResult> {
     }
 
     // 2. Audit log entry
-    try {
-      const { error: auditErr } = await supabase.from('audit_logs').insert({
-        performed_by: user.id,
-        action: 'SETTINGS_UPDATED',
-        entity_type: 'app_settings',
-        entity_id: settingsId ?? null,
-        changes_summary: payload,
-      })
-      if (auditErr) {
-        console.warn('Audit log insert for SETTINGS_UPDATED error:', {
-          message: auditErr.message,
-          code: auditErr.code,
-          details: auditErr.details,
-          hint: auditErr.hint,
-        })
-      }
-    } catch (auditCatch) {
-      console.warn('Audit log insert exception:', auditCatch)
-    }
+    await createAuditLog(supabase, {
+      action: 'SETTINGS_UPDATED',
+      entity_type: 'app_settings',
+      entity_id: settingsId ?? null,
+      changes_summary: payload as Record<string, unknown>,
+    })
 
     revalidatePath('/admin/settings')
     revalidatePath('/admin/barcode-print')

@@ -32,6 +32,50 @@ interface ItemData {
 }
 
 /**
+ * Safely check if a MediaStreamTrack supports continuous focusMode
+ */
+export function checkTrackFocusModeCapability(track: MediaStreamTrack | null | undefined): boolean {
+  if (!track || track.readyState !== 'live') return false
+  if (typeof track.getCapabilities !== 'function') return false
+  try {
+    const caps = track.getCapabilities() as { focusMode?: string[] }
+    return Array.isArray(caps?.focusMode) && caps.focusMode.includes('continuous')
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Safely apply continuous focusMode constraint wrapped in try/catch to ensure camera scanning stability
+ */
+export async function safeApplyContinuousFocus(
+  stream: MediaStream | null
+): Promise<boolean> {
+  if (!stream) return false
+  const videoTracks = stream.getVideoTracks()
+  let success = false
+
+  for (const track of videoTracks) {
+    if (track.readyState === 'live' && typeof track.getCapabilities === 'function') {
+      try {
+        const caps = track.getCapabilities() as { focusMode?: string[] }
+        if (Array.isArray(caps?.focusMode) && caps.focusMode.includes('continuous')) {
+          await track.applyConstraints({
+            advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet],
+          })
+          success = true
+        }
+      } catch (err) {
+        console.warn('Focus mode constraint application failed non-fatally:', err)
+        success = false
+      }
+    }
+  }
+
+  return success
+}
+
+/**
  * Safely check if a MediaStreamTrack supports torch/flash
  */
 export function checkTrackTorchCapability(track: MediaStreamTrack | null | undefined): boolean {
@@ -209,8 +253,16 @@ export default function ScanClient() {
     setErrorMsg(null)
     setScanToast(null)
 
-    const item = await searchItemByCode(code)
+    const res = await searchItemByCode(code)
     setSearchLoading(false)
+
+    const item = res && 'item' in res ? res.item : (res as unknown as ItemData | null)
+    const err = res && 'error' in res ? res.error : null
+
+    if (err) {
+      setErrorMsg(err)
+      return
+    }
 
     if (item) {
       setSelectedItem(item as unknown as ItemData)
@@ -319,7 +371,12 @@ export default function ScanClient() {
         return
       }
 
-      // Step C: Set UI state to running immediately so camera preview appears in < 1-2s!
+      // Step C: Apply continuous focus mode safely AFTER video starts playing & BEFORE ZXing decoder attachment
+      await safeApplyContinuousFocus(stream).catch((focusErr) => {
+        console.warn('Continuous focus application caught non-fatally:', focusErr)
+      })
+
+      // Step D: Set UI state to running immediately so camera preview appears in < 1-2s!
       const videoTrack = stream.getVideoTracks()[0]
       const hasTorch = checkTrackTorchCapability(videoTrack)
       setTorchSupported(hasTorch)

@@ -15,7 +15,7 @@ const loginSchema = z.object({
       .max(32)
       .regex(/^[a-z0-9._-]+$/),
   ),
-  password: z.string().min(10).max(128),
+  password: z.string().min(1, 'Kata sandi wajib diisi.').max(128),
 })
 
 const GENERIC_AUTH_ERROR = {

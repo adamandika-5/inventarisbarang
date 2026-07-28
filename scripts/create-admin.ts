@@ -94,8 +94,8 @@ function validateUsername(username: string): string | null {
 }
 
 function validatePassword(password: string): string | null {
-  if (password.length < 10) {
-    return 'Password must be at least 10 characters.'
+  if (password.length < 6) {
+    return 'Password must be at least 6 characters.'
   }
   if (password.length > 128) {
     return 'Password must not exceed 128 characters.'
@@ -137,7 +137,7 @@ async function main() {
     password = process.env['ADMIN_PASSWORD']
     console.log('(Using ADMIN_PASSWORD from environment)')
   } else {
-    password = await promptPassword('Password (min 10 chars): ')
+    password = await promptPassword('Password (min 6 chars): ')
     const confirmPassword = await promptPassword('Confirm password: ')
     if (password !== confirmPassword) {
       console.error('ERROR: Passwords do not match.')

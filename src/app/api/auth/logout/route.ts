@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import type { Database } from '@/types/database'
 
 export async function POST(_request: NextRequest) {
+  const startTime = performance.now()
   const cookieStore = await cookies()
 
   const supabase = createServerClient<Database>(
@@ -31,7 +32,19 @@ export async function POST(_request: NextRequest) {
     },
   )
 
-  await supabase.auth.signOut()
+  const signOutStart = performance.now()
+  const { error: signOutError } = await supabase.auth.signOut()
+  const signOutDuration = performance.now() - signOutStart
+
+  if (signOutError) {
+    if (process.env.NODE_ENV === 'development') {
+      console.error(`[PERF] Logout signOut error (${signOutDuration.toFixed(2)}ms):`, signOutError.message)
+    }
+    return NextResponse.json(
+      { success: false, error: signOutError.message || 'Gagal keluar dari server auth.' },
+      { status: 500 },
+    )
+  }
 
   // Explicitly clear any remaining supabase auth cookies
   const allCookies = cookieStore.getAll()
@@ -39,6 +52,14 @@ export async function POST(_request: NextRequest) {
     if (c.name.includes('sb-') || c.name.includes('auth') || c.name.includes('token')) {
       cookieStore.delete(c.name)
     }
+  }
+
+  const totalDuration = performance.now() - startTime
+  if (process.env.NODE_ENV === 'development') {
+    // eslint-disable-next-line no-console
+    console.log(
+      `[PERF] Logout API POST complete (signOut: ${signOutDuration.toFixed(2)}ms, total: ${totalDuration.toFixed(2)}ms)`,
+    )
   }
 
   const response = NextResponse.json({ success: true })

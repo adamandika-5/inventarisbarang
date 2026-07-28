@@ -73,48 +73,54 @@ export default async function EmployeeDashboardPage() {
         </p>
       </div>
 
-      {/* Primary Quick Actions — #17263D surface cards */}
+      {/* Primary Quick Actions */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {/* Scan Ambil Barang */}
         <Link
           href="/employee/scan"
-          className="flex flex-col items-center justify-center rounded-lg border border-blue-200 bg-blue-50 p-6 text-center transition-all hover:border-blue-300 hover:bg-blue-100 hover:shadow-md dark:border-[#22D3EE]/30 dark:bg-[#17263D] dark:hover:bg-[#203552]"
+          className="group flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm transition-colors hover:border-blue-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:hover:bg-slate-800"
         >
-          <div className="mb-3 rounded-full bg-blue-100 p-3 text-blue-700 dark:bg-[#22D3EE]/20 dark:text-[#22D3EE]">
-            <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-blue-950/50 dark:group-hover:text-blue-400">
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
             </svg>
           </div>
-          <span className="text-lg font-bold text-slate-900 dark:text-white">Scan Ambil Barang</span>
-          <span className="mt-1 text-xs text-slate-600 dark:text-slate-300">Pindai barcode kamera/manual</span>
+          <span className="text-base font-bold text-slate-800 transition-colors group-hover:text-blue-600 dark:text-slate-100 dark:group-hover:text-blue-400">
+            Scan Ambil Barang
+          </span>
+          <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">Pindai barcode kamera/manual</span>
         </Link>
 
         {/* Barang Keluar */}
         <Link
           href="/employee/stock-out"
-          className="flex flex-col items-center justify-center rounded-lg border border-amber-200 bg-amber-50 p-6 text-center transition-all hover:border-amber-300 hover:bg-amber-100 hover:shadow-md dark:border-amber-800/50 dark:bg-[#17263D] dark:hover:bg-[#203552]"
+          className="group flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm transition-colors hover:border-blue-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:hover:bg-slate-800"
         >
-          <div className="mb-3 rounded-full bg-amber-100 p-3 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300">
-            <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-blue-950/50 dark:group-hover:text-blue-400">
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 13l-5 5m0 0l-5-5m5 5V6" />
             </svg>
           </div>
-          <span className="text-lg font-bold text-slate-900 dark:text-white">Barang Keluar</span>
-          <span className="mt-1 text-xs text-slate-600 dark:text-slate-300">Catat pengeluaran stok</span>
+          <span className="text-base font-bold text-slate-800 transition-colors group-hover:text-blue-600 dark:text-slate-100 dark:group-hover:text-blue-400">
+            Barang Keluar
+          </span>
+          <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">Catat pengeluaran stok</span>
         </Link>
 
         {/* Cek Stok */}
         <Link
           href="/employee/items"
-          className="flex flex-col items-center justify-center rounded-lg border border-cyan-200 bg-cyan-50 p-6 text-center transition-all hover:border-cyan-300 hover:bg-cyan-100 hover:shadow-md dark:border-[#22D3EE]/30 dark:bg-[#17263D] dark:hover:bg-[#203552]"
+          className="group flex flex-col items-center justify-center rounded-xl border border-slate-200 bg-white p-6 text-center shadow-sm transition-colors hover:border-blue-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 dark:hover:bg-slate-800"
         >
-          <div className="mb-3 rounded-full bg-cyan-100 p-3 text-cyan-700 dark:bg-[#22D3EE]/20 dark:text-[#22D3EE]">
-            <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-slate-100 text-slate-600 transition-colors group-hover:bg-blue-50 group-hover:text-blue-600 dark:bg-slate-800 dark:text-slate-300 dark:group-hover:bg-blue-950/50 dark:group-hover:text-blue-400">
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
             </svg>
           </div>
-          <span className="text-lg font-bold text-slate-900 dark:text-white">Cek Stok</span>
-          <span className="mt-1 text-xs text-slate-600 dark:text-slate-300">Cari barang &amp; cek ketersediaan</span>
+          <span className="text-base font-bold text-slate-800 transition-colors group-hover:text-blue-600 dark:text-slate-100 dark:group-hover:text-blue-400">
+            Cek Stok
+          </span>
+          <span className="mt-1 text-xs text-slate-500 dark:text-slate-400">Cari barang &amp; cek ketersediaan</span>
         </Link>
       </div>
 

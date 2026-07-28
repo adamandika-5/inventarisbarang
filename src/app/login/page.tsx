@@ -42,7 +42,7 @@ export default function LoginPage() {
         </div>
 
         <p className="mt-6 text-center text-xs text-slate-400 dark:text-slate-400">
-          Tidak dapat masuk? Hubungi administrator.
+          © 2026 FK Saintek 12 UNIPDU x BPS Kota Mojokerto.
         </p>
       </div>
     </main>

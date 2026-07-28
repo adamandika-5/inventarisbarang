@@ -5,7 +5,7 @@
  * - Validates current session
  * - Verifies user active status and profile role
  * - Verifies current password using signInWithPassword (re-authentication)
- * - Validates new password strength (min 10 characters)
+ * - Validates new password strength (min 6 characters)
  * - Updates password in Supabase Auth
  * - Calls complete_forced_password_change RPC ONLY if must_change_password was previously true
  * - Returns target redirect route based on mode and user role
@@ -19,7 +19,7 @@ const changePasswordSchema = z.object({
   currentPassword: z.string().min(1, 'Kata sandi saat ini wajib diisi.'),
   newPassword: z
     .string()
-    .min(10, 'Kata sandi baru minimal 10 karakter.')
+    .min(6, 'Kata sandi baru minimal 6 karakter.')
     .max(128, 'Kata sandi baru terlalu panjang.'),
 })
 

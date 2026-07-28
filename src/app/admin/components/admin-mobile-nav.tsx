@@ -5,7 +5,7 @@
  */
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import ThemeToggle from '@/components/theme-toggle'
 
@@ -31,7 +31,6 @@ const navItems = [
 export default function AdminMobileNav({ fullName }: AdminMobileNavProps) {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
-  const router = useRouter()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
@@ -48,21 +47,37 @@ export default function AdminMobileNav({ fullName }: AdminMobileNavProps) {
     setIsLoggingOut(true)
     setErrorMsg(null)
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000)
+
     try {
-      const res = await fetch('/api/auth/logout', { method: 'POST' })
+      const res = await fetch('/api/auth/logout', {
+        method: 'POST',
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+
       if (!res.ok) {
-        throw new Error('Gagal keluar dari akun. Silakan coba lagi.')
+        const data = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(data.error || 'Gagal keluar dari akun. Silakan coba lagi.')
       }
+
       const data = (await res.json()) as { success?: boolean; error?: string }
       if (!data.success) {
         throw new Error(data.error || 'Gagal keluar dari akun. Silakan coba lagi.')
       }
-      router.replace('/login')
-      router.refresh()
+
+      // Single safe navigation replacement to clear client router cache and memory
+      window.location.replace('/login')
     } catch (err: unknown) {
+      clearTimeout(timeoutId)
       setIsLoggingOut(false)
-      const msg = err instanceof Error ? err.message : 'Gagal keluar dari akun.'
-      setErrorMsg(msg)
+      if (err instanceof Error && err.name === 'AbortError') {
+        setErrorMsg('Koneksi lambat saat keluar. Silakan coba lagi.')
+      } else {
+        const msg = err instanceof Error ? err.message : 'Gagal keluar dari akun.'
+        setErrorMsg(msg)
+      }
     }
   }
 
@@ -84,7 +99,7 @@ export default function AdminMobileNav({ fullName }: AdminMobileNavProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <span className="ml-3 text-lg font-bold text-slate-900 dark:text-white">InventarisBarang</span>
+          <span className="ml-3 text-lg font-bold text-slate-900 dark:text-white">Inventaris Barang</span>
         </div>
         <ThemeToggle className="text-slate-600 dark:text-slate-300" />
       </header>

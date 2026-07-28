@@ -74,8 +74,6 @@ export default async function ReportsPage({
     summaryQuery = summaryQuery.eq('item_id', itemFilter)
   }
 
-  const { data: summaryData, error: summaryError } = await summaryQuery
-
   // ── Transactions table ───────────────────────────────────────────────────────
 
   let txQuery = supabase
@@ -95,19 +93,46 @@ export default async function ReportsPage({
     txQuery = txQuery.eq('item_id', itemFilter)
   }
 
-  const { data: transactions, count: txCount, error: txError } = await txQuery
+  const reportsStart = performance.now()
+  const [
+    { data: summaryData, error: summaryError },
+    { data: transactions, count: txCount, error: txError },
+    { data: allActiveItems, error: lowStockError },
+  ] = await Promise.all([
+    summaryQuery,
+    txQuery,
+    supabase
+      .from('items')
+      .select('id,sku,name,current_stock,minimum_stock,base_unit:units!base_unit_id(id,name,symbol)')
+      .eq('is_active', true)
+      .order('current_stock', { ascending: true }),
+  ])
 
-  // ── Low stock items ──────────────────────────────────────────────────────────
+  if (process.env.NODE_ENV === 'development') {
+    // eslint-disable-next-line no-console
+    console.log(`[PERF] ReportsPage parallel data queries: ${(performance.now() - reportsStart).toFixed(2)}ms`)
+  }
 
-  const { data: allActiveItems, error: lowStockError } = await supabase
-    .from('items')
-    .select('id,sku,name,current_stock,minimum_stock,base_unit:units!base_unit_id(id,name,symbol)')
-    .eq('is_active', true)
-    .order('current_stock', { ascending: true })
+  type RawItem = {
+    id: string
+    sku: string
+    name: string
+    current_stock: number
+    minimum_stock: number
+    base_unit: { id: string; name: string; symbol: string } | Array<{ id: string; name: string; symbol: string }> | null
+  }
 
-  const lowStockItems = (allActiveItems ?? [])
+  const lowStockItems = ((allActiveItems ?? []) as unknown as RawItem[])
     .filter((item) => Number(item.current_stock) <= Number(item.minimum_stock))
     .slice(0, 20)
+    .map((item) => ({
+      id: item.id,
+      sku: item.sku,
+      name: item.name,
+      current_stock: item.current_stock,
+      minimum_stock: item.minimum_stock,
+      base_unit: Array.isArray(item.base_unit) ? item.base_unit[0] ?? null : item.base_unit,
+    }))
 
   // Compute summary (totalIn = sum of positive deltas, totalOut = sum of negative deltas as abs)
   const summary = {

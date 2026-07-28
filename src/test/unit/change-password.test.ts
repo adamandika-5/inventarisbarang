@@ -40,8 +40,8 @@ async function handlePasswordChange(params: {
     return { status: 400, body: { error: 'Kata sandi saat ini wajib diisi.' } }
   }
 
-  if (!params.newPasswordInput || params.newPasswordInput.length < 10) {
-    return { status: 400, body: { error: 'Kata sandi baru minimal 10 karakter.' } }
+  if (!params.newPasswordInput || params.newPasswordInput.length < 6) {
+    return { status: 400, body: { error: 'Kata sandi baru minimal 6 karakter.' } }
   }
 
   // 2. Auth check
@@ -114,6 +114,21 @@ describe('Change Password Handler — Error Cases', () => {
 
     expect(result.status).toBe(401)
     expect(result.body.error).toBe('Sesi tidak valid. Silakan login kembali.')
+  })
+
+  it('should reject new password shorter than 6 characters', async () => {
+    const result = await handlePasswordChange({
+      currentPasswordInput: 'correct_password_123',
+      newPasswordInput: '12345',
+      actualCurrentPassword: 'correct_password_123',
+      authUser: baseUser,
+      updateAuthSuccess: true,
+      rpcSuccess: true,
+      userProfile: { role: 'EMPLOYEE', is_active: true, must_change_password: false },
+    })
+
+    expect(result.status).toBe(400)
+    expect(result.body.error).toBe('Kata sandi baru minimal 6 karakter.')
   })
 
   it('should reject inactive account (is_active = false)', async () => {

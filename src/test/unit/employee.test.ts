@@ -16,7 +16,7 @@ function normalizeUsername(raw: string): string {
 // --- Password validation (mirrors auth.ts + actions.ts Zod schema) ---
 function validatePassword(password: string): string | null {
   if (!password || password.length === 0) return 'Password wajib diisi.'
-  if (password.length < 10) return 'Password sementara minimal 10 karakter.'
+  if (password.length < 6) return 'Password sementara minimal 6 karakter.'
   if (password.length > 72) return 'Password terlalu panjang.'
   return null
 }
@@ -86,14 +86,16 @@ describe('Employee Creation — Username Validation', () => {
 })
 
 describe('Employee Creation — Password Validation', () => {
-  it('should accept password with 10+ characters', () => {
-    expect(validatePassword('1234567890')).toBeNull()
-    expect(validatePassword('secure_pass_word')).toBeNull()
+  it('should accept password with 6+ characters', () => {
+    expect(validatePassword('123456')).toBeNull()
+    expect(validatePassword('abcdef')).toBeNull()
+    expect(validatePassword('aaaaaa')).toBeNull()
+    expect(validatePassword('admin1')).toBeNull()
   })
 
-  it('should reject password shorter than 10 characters', () => {
-    expect(validatePassword('12345678')).toBe('Password sementara minimal 10 karakter.')
-    expect(validatePassword('123456789')).toBe('Password sementara minimal 10 karakter.')
+  it('should reject password shorter than 6 characters (5 chars)', () => {
+    expect(validatePassword('12345')).toBe('Password sementara minimal 6 karakter.')
+    expect(validatePassword('abcde')).toBe('Password sementara minimal 6 karakter.')
   })
 
   it('should reject empty password', () => {
@@ -104,8 +106,8 @@ describe('Employee Creation — Password Validation', () => {
     expect(validatePassword('a'.repeat(73))).toBe('Password terlalu panjang.')
   })
 
-  it('should accept password of exactly 10 characters', () => {
-    expect(validatePassword('abcdefghij')).toBeNull()
+  it('should accept password of exactly 6 characters', () => {
+    expect(validatePassword('abcdef')).toBeNull()
   })
 })
 

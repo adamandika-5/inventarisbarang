@@ -10,6 +10,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
+import { createAuditLog } from '@/lib/audit'
 
 const unitSchema = z.object({
   name: z
@@ -66,12 +67,16 @@ export async function createUnit(formData: FormData): Promise<ActionResult> {
       return { success: false, error: parsed.error.issues[0]?.message ?? 'Input tidak valid.' }
     }
 
-    const { error } = await supabase.from('units').insert({
-      name: parsed.data.name,
-      name_normalized: parsed.data.name.toLowerCase(),
-      symbol: parsed.data.symbol,
-      is_active: true,
-    })
+    const { data: unit, error } = await supabase
+      .from('units')
+      .insert({
+        name: parsed.data.name,
+        name_normalized: parsed.data.name.toLowerCase(),
+        symbol: parsed.data.symbol,
+        is_active: true,
+      })
+      .select('id')
+      .single()
 
     if (error) {
       if (error.code === '23505') {
@@ -80,10 +85,17 @@ export async function createUnit(formData: FormData): Promise<ActionResult> {
       return { success: false, error: 'Gagal membuat satuan.' }
     }
 
+    await createAuditLog(supabase, {
+      action: 'UNIT_CREATED',
+      entity_type: 'units',
+      entity_id: unit?.id ?? null,
+      changes_summary: { name: parsed.data.name, symbol: parsed.data.symbol },
+    })
+
     revalidatePath('/admin/units')
     return { success: true }
-  } catch {
-    return { success: false, error: 'Terjadi kesalahan pada server.' }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Terjadi kesalahan pada server.' }
   }
 }
 
@@ -115,10 +127,17 @@ export async function updateUnit(id: string, formData: FormData): Promise<Action
       return { success: false, error: 'Gagal memperbarui satuan.' }
     }
 
+    await createAuditLog(supabase, {
+      action: 'UNIT_UPDATED',
+      entity_type: 'units',
+      entity_id: id,
+      changes_summary: { name: parsed.data.name, symbol: parsed.data.symbol },
+    })
+
     revalidatePath('/admin/units')
     return { success: true }
-  } catch {
-    return { success: false, error: 'Terjadi kesalahan pada server.' }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Terjadi kesalahan pada server.' }
   }
 }
 
@@ -169,9 +188,17 @@ export async function toggleUnitActive(id: string, currentIsActive: boolean): Pr
       return { success: false, error: 'Gagal mengubah status satuan.' }
     }
 
+    if (currentIsActive) {
+      await createAuditLog(supabase, {
+        action: 'UNIT_DEACTIVATED',
+        entity_type: 'units',
+        entity_id: id,
+      })
+    }
+
     revalidatePath('/admin/units')
     return { success: true }
-  } catch {
-    return { success: false, error: 'Terjadi kesalahan pada server.' }
+  } catch (e) {
+    return { success: false, error: e instanceof Error ? e.message : 'Terjadi kesalahan pada server.' }
   }
 }

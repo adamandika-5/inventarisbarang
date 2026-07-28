@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import ThemeToggle from '@/components/theme-toggle'
 
 interface EmployeeNavProps {
@@ -12,7 +12,6 @@ interface EmployeeNavProps {
 export default function EmployeeNav({ fullName }: EmployeeNavProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const pathname = usePathname()
-  const router = useRouter()
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
@@ -34,21 +33,37 @@ export default function EmployeeNav({ fullName }: EmployeeNavProps) {
     setIsLoggingOut(true)
     setErrorMsg(null)
 
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000)
+
     try {
-      const res = await fetch('/api/auth/logout', { method: 'POST' })
+      const res = await fetch('/api/auth/logout', {
+        method: 'POST',
+        signal: controller.signal,
+      })
+      clearTimeout(timeoutId)
+
       if (!res.ok) {
-        throw new Error('Gagal keluar dari akun. Silakan coba lagi.')
+        const data = (await res.json().catch(() => ({}))) as { error?: string }
+        throw new Error(data.error || 'Gagal keluar dari akun. Silakan coba lagi.')
       }
+
       const data = (await res.json()) as { success?: boolean; error?: string }
       if (!data.success) {
         throw new Error(data.error || 'Gagal keluar dari akun. Silakan coba lagi.')
       }
-      router.replace('/login')
-      router.refresh()
+
+      // Single safe navigation replacement to clear client router cache and memory
+      window.location.replace('/login')
     } catch (err: unknown) {
+      clearTimeout(timeoutId)
       setIsLoggingOut(false)
-      const msg = err instanceof Error ? err.message : 'Gagal keluar dari akun.'
-      setErrorMsg(msg)
+      if (err instanceof Error && err.name === 'AbortError') {
+        setErrorMsg('Koneksi lambat saat keluar. Silakan coba lagi.')
+      } else {
+        const msg = err instanceof Error ? err.message : 'Gagal keluar dari akun.'
+        setErrorMsg(msg)
+      }
     }
   }
 
@@ -56,13 +71,10 @@ export default function EmployeeNav({ fullName }: EmployeeNavProps) {
     <header className="sticky top-0 z-30 border-b border-gray-200 dark:border-white/10 bg-white dark:bg-[#101D31] shadow-sm transition-colors">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
         <div className="flex h-16 items-center justify-between">
-          {/* Logo & Brand */}
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-600 dark:bg-[#22D3EE] font-bold text-white dark:text-[#0B1220] shadow">
-              IB
-            </div>
+          {/* Brand */}
+          <div className="flex items-center">
             <Link href="/employee" className="text-lg font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-[#22D3EE]">
-              InventarisBarang
+              Inventaris Barang
             </Link>
           </div>
 

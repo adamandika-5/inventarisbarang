@@ -6,7 +6,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { updateItem, deactivateItem, activateItem } from '../actions'
+import { updateItem, deactivateItem, activateItem, generateAutoBarcode } from '../actions'
 
 interface Category { id: string; name: string }
 interface Unit { id: string; name: string; symbol: string }
@@ -47,6 +47,32 @@ export default function ItemDetailClient({
   const [isEditing, setIsEditing] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [editBarcodeFormat, setEditBarcodeFormat] = useState(item.barcode_format)
+  const [editBarcodeValue, setEditBarcodeValue] = useState(item.barcode)
+  const [isGeneratingBarcode, setIsGeneratingBarcode] = useState(false)
+  const [genError, setGenError] = useState<string | null>(null)
+
+  const handleGenerateBarcode = async () => {
+    if (isGeneratingBarcode) return
+    if (editBarcodeValue.trim()) {
+      const confirmed = window.confirm('Barang ini sudah memiliki barcode. Yakin ingin mengganti dengan barcode baru?')
+      if (!confirmed) return
+    }
+    setIsGeneratingBarcode(true)
+    setGenError(null)
+    try {
+      const res = await generateAutoBarcode()
+      if (res.success && res.barcode) {
+        setEditBarcodeValue(res.barcode)
+      } else {
+        setGenError(res.error ?? 'Gagal membuat barcode.')
+      }
+    } catch {
+      setGenError('Terjadi kesalahan jaringan saat membuat barcode.')
+    } finally {
+      setIsGeneratingBarcode(false)
+    }
+  }
 
   const showMsg = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text })
@@ -204,7 +230,13 @@ export default function ItemDetailClient({
 
           <div>
             <label htmlFor="edit-item-barcode-format" className="label mb-1">Format Barcode</label>
-            <select id="edit-item-barcode-format" name="barcode_format" className="input" defaultValue={item.barcode_format}>
+            <select
+              id="edit-item-barcode-format"
+              name="barcode_format"
+              className="input"
+              value={editBarcodeFormat}
+              onChange={(e) => setEditBarcodeFormat(e.target.value)}
+            >
               {BARCODE_FORMATS.map((f) => (
                 <option key={f} value={f}>{f}</option>
               ))}
@@ -213,8 +245,32 @@ export default function ItemDetailClient({
 
           <div>
             <label htmlFor="edit-item-barcode" className="label mb-1">Barcode</label>
-            <input id="edit-item-barcode" name="barcode" type="text" required maxLength={256}
-              defaultValue={item.barcode} className="input font-mono" />
+            <div className="flex gap-2">
+              <input
+                id="edit-item-barcode"
+                name="barcode"
+                type="text"
+                required
+                maxLength={256}
+                value={editBarcodeValue}
+                onChange={(e) => setEditBarcodeValue(e.target.value)}
+                className="input font-mono flex-1"
+              />
+              {editBarcodeFormat === 'CODE128' && (
+                <button
+                  type="button"
+                  id="btn-edit-generate-barcode"
+                  onClick={handleGenerateBarcode}
+                  disabled={isGeneratingBarcode}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 shrink-0 transition-colors"
+                >
+                  {isGeneratingBarcode ? 'Membuat…' : editBarcodeValue.trim() ? 'Buat Ulang' : 'Buat Otomatis'}
+                </button>
+              )}
+            </div>
+            {genError && (
+              <p className="mt-1 text-xs font-medium text-red-600 dark:text-red-400">{genError}</p>
+            )}
           </div>
 
           <div>

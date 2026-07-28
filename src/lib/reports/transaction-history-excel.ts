@@ -47,7 +47,7 @@ function formatIndonesianDateTime(d: Date): string {
 
 function getTypeFilterLabel(typeFilter?: string): string {
   if (!typeFilter || typeFilter === 'ALL') return 'Semua Jenis'
-  if (typeFilter === 'INITIAL') return 'Stok Awal'
+  if (typeFilter === 'INITIAL') return 'Stok Pembukaan'
   if (typeFilter === 'IN') return 'Barang Masuk'
   if (typeFilter === 'OUT') return 'Barang Keluar'
   if (typeFilter === 'ADJUSTMENT') return 'Penyesuaian'
@@ -69,7 +69,7 @@ export interface BuildTransactionHistoryParams {
 const TYPE_LABELS: Record<TransactionType, string> = {
   IN: 'Barang Masuk',
   OUT: 'Barang Keluar',
-  INITIAL: 'Stok Awal',
+  INITIAL: 'Stok Pembukaan',
   ADJUSTMENT_IN: 'Penyesuaian Masuk',
   ADJUSTMENT_OUT: 'Penyesuaian Keluar',
   REVERSAL: 'Koreksi',

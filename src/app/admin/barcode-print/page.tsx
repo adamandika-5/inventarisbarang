@@ -9,17 +9,24 @@ export const metadata: Metadata = {
 export default async function BarcodePrintPage() {
   const supabase = await createSupabaseServerClient()
 
-  const { data: items, error } = await supabase
-    .from('items')
-    .select('id,sku,barcode,barcode_format,name,is_active,base_unit:units!base_unit_id(id,name,symbol)')
-    .eq('is_active', true)
-    .order('name')
+  const printStart = performance.now()
+  const [{ data: items, error }, { data: settings }] = await Promise.all([
+    supabase
+      .from('items')
+      .select('id,sku,barcode,barcode_format,name,is_active,base_unit:units!base_unit_id(id,name,symbol)')
+      .eq('is_active', true)
+      .order('name'),
+    supabase
+      .from('app_settings')
+      .select('default_barcode_label_count')
+      .limit(1)
+      .maybeSingle(),
+  ])
 
-  const { data: settings } = await supabase
-    .from('app_settings')
-    .select('default_barcode_label_count')
-    .limit(1)
-    .maybeSingle()
+  if (process.env.NODE_ENV === 'development') {
+    // eslint-disable-next-line no-console
+    console.log(`[PERF] BarcodePrintPage parallel data queries: ${(performance.now() - printStart).toFixed(2)}ms`)
+  }
 
   const defaultLabelCount = settings?.default_barcode_label_count ?? 1
 

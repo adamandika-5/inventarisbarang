@@ -15,6 +15,20 @@ export default async function ItemsPage({
   const supabase = await createSupabaseServerClient()
   const params = await searchParams
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  let isAdmin = false
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, is_active')
+      .eq('id', user.id)
+      .single()
+    isAdmin = !!(profile?.is_active && profile.role === 'ADMIN')
+  }
+
   const search = params.search?.trim() ?? ''
   const categoryFilter = params.category ?? ''
   const activeFilter = params.active ?? 'true' // default: show active items
@@ -44,14 +58,20 @@ export default async function ItemsPage({
 
   query = query.order('name').range(offset, offset + pageSize - 1)
 
-  const { data: items, count, error } = await query
+  const itemsStart = performance.now()
+  const [{ data: items, count, error }, { data: categories }] = await Promise.all([
+    query,
+    supabase
+      .from('categories')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name'),
+  ])
 
-  // Load categories for filter dropdown
-  const { data: categories } = await supabase
-    .from('categories')
-    .select('id, name')
-    .eq('is_active', true)
-    .order('name')
+  if (process.env.NODE_ENV === 'development') {
+    // eslint-disable-next-line no-console
+    console.log(`[PERF] ItemsPage parallel data queries: ${(performance.now() - itemsStart).toFixed(2)}ms`)
+  }
 
   if (error) {
     return (
@@ -85,6 +105,7 @@ export default async function ItemsPage({
         search={search}
         categoryFilter={categoryFilter}
         activeFilter={activeFilter}
+        isAdmin={isAdmin}
       />
     </div>
   )

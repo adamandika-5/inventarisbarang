@@ -3,7 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { PasswordInput } from '@/components/password-input'
-import { validateUsername, validatePassword } from '@/lib/validation/auth'
+import { validateUsername } from '@/lib/validation/auth'
 
 interface FormState {
   username: string
@@ -34,7 +34,7 @@ export default function LoginForm() {
 
       // Client-side validation (UX layer)
       const usernameError = validateUsername(state.username)
-      const passwordError = validatePassword(state.password)
+      const passwordError = !state.password || state.password.length === 0 ? 'Kata sandi wajib diisi.' : null
 
       if (usernameError || passwordError) {
         setState((prev) => ({

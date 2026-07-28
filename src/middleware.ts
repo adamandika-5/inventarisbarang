@@ -23,6 +23,15 @@ const ADMIN_ROUTES = ['/admin']
 const EMPLOYEE_ROUTES = ['/employee']
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname
+
+  // Allow public auth API routes immediately without calling getUser()
+  if (pathname === '/api/auth/login' || pathname === '/api/auth/logout') {
+    const res = NextResponse.next({ request })
+    res.headers.set('Cache-Control', 'no-store, max-age=0, must-revalidate')
+    return res
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient<Database>(
@@ -44,18 +53,29 @@ export async function middleware(request: NextRequest) {
     },
   )
 
-  // Refresh session — do not remove, critical for Supabase SSR
+  // Fast path for login page when no auth cookie is present
+  const hasAuthCookie = request.cookies.getAll().some((c) => c.name.includes('sb-') || c.name.includes('token'))
+
+  if (pathname === '/login' && !hasAuthCookie) {
+    return supabaseResponse
+  }
+
+  // Refresh session & validate auth
+  const startAuth = performance.now()
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const pathname = request.nextUrl.pathname
+  if (process.env.NODE_ENV === 'development') {
+    const duration = performance.now() - startAuth
+    // eslint-disable-next-line no-console
+    console.log(`[PERF] Middleware auth check (${pathname}): ${duration.toFixed(2)}ms`)
+  }
 
   // Allow public routes
   if (PUBLIC_ROUTES.some((route) => pathname.startsWith(route))) {
-    // If already logged in, redirect to appropriate dashboard
+    // If logged in and hitting /login, redirect to /admin
     if (user && pathname === '/login') {
-      // Check role and redirect — will be implemented with profile lookup
       return NextResponse.redirect(new URL('/admin', request.url))
     }
     return supabaseResponse

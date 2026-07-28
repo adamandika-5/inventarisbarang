@@ -166,7 +166,7 @@ export default function ChangePasswordForm() {
         {state.errors.newPassword && (
           <p className="mt-1 text-xs text-red-600">{state.errors.newPassword}</p>
         )}
-        <p className="mt-1 text-xs text-gray-500">Minimal 10 karakter.</p>
+        <p className="mt-1 text-xs text-gray-500">Minimal 6 karakter.</p>
       </div>
 
       <div className="mb-6">

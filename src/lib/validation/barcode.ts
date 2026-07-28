@@ -114,6 +114,38 @@ export function validateUpcAChecksum(barcode: string): boolean {
   const checkDigit = (10 - (sum % 10)) % 10
   return parseInt(barcode[11]!, 10) === checkDigit
 }
+export const ALLOWED_AUTO_BARCODE_CHARS = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ'
+export const AUTO_BARCODE_PATTERN = /^IB-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/
+export const LEGACY_AUTO_BARCODE_PATTERN = /^IB-\d{6}-[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{6}$/
+
+/**
+ * Generate an automatic Code 128 barcode string following pattern: IB-XXXXXX
+ * - IB: InventarisBarang prefix
+ * - XXXXXX: 6 random uppercase alphanumeric characters (excluding I, O, 0, 1)
+ *
+ * Uses Web Crypto / Node Crypto API. Does NOT use Math.random().
+ */
+export function generateAutoBarcodePattern(): string {
+  const bytes = new Uint8Array(6)
+  if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
+    crypto.getRandomValues(bytes)
+  } else {
+    // Node.js fallback
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const nodeCrypto = require('node:crypto')
+    const buf = nodeCrypto.randomBytes(6)
+    bytes.set(buf)
+  }
+
+  let randomSuffix = ''
+  for (let i = 0; i < 6; i++) {
+    const index = bytes[i]! % ALLOWED_AUTO_BARCODE_CHARS.length
+    randomSuffix += ALLOWED_AUTO_BARCODE_CHARS[index]
+  }
+
+  return `IB-${randomSuffix}`
+}
+
 /**
  * Alias for validateBarcode — used in server actions.
  * Returns { valid, error } without the normalized value.

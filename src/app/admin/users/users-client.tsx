@@ -61,9 +61,9 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
   }
 
   const handleResetPassword = (id: string, fullName: string) => {
-    const tempPass = prompt(`Reset password ${fullName}.\n\nMasukkan password sementara (minimal 10 karakter):`)
-    if (!tempPass || tempPass.length < 10) {
-      if (tempPass !== null) showMsg('error', 'Password sementara minimal 10 karakter.')
+    const tempPass = prompt(`Reset password ${fullName}.\n\nMasukkan password sementara (minimal 6 karakter):`)
+    if (!tempPass || tempPass.length < 6) {
+      if (tempPass !== null) showMsg('error', 'Password sementara minimal 6 karakter.')
       return
     }
     if (!confirm(`Anda akan mengatur ulang password ${fullName}. Lanjutkan?`)) return

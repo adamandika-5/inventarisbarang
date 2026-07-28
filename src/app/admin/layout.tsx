@@ -20,11 +20,17 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   }
 
   // Verify admin role and active status (defense in depth)
+  const profileStart = performance.now()
   const { data: profile } = await supabase
     .from('profiles')
     .select('role,is_active,must_change_password,full_name,username')
     .eq('id', user.id)
     .single()
+
+  if (process.env.NODE_ENV === 'development') {
+    // eslint-disable-next-line no-console
+    console.log(`[PERF] AdminLayout profile lookup: ${(performance.now() - profileStart).toFixed(2)}ms`)
+  }
 
   if (!profile || !profile.is_active) {
     redirect('/login')
@@ -45,7 +51,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       <AdminSidebar fullName={profile.full_name ?? profile.username ?? 'Admin'} />
 
       {/* Main content area */}
-      <div className="flex flex-1 flex-col min-w-0 lg:pl-72">
+      <div className="flex flex-1 flex-col min-w-0 lg:pl-64">
         {/* Mobile header */}
         <AdminMobileNav fullName={profile.full_name ?? profile.username ?? 'Admin'} />
 

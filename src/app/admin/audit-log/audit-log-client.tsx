@@ -42,7 +42,7 @@ const ACTION_LABELS: Record<string, string> = {
   UNIT_CREATED: 'Satuan Dibuat',
   UNIT_UPDATED: 'Satuan Diperbarui',
   UNIT_DEACTIVATED: 'Satuan Dinonaktifkan',
-  STOCK_INITIAL: 'Stok Awal',
+  STOCK_INITIAL: 'Stok Pembukaan',
   STOCK_IN: 'Barang Masuk',
   STOCK_OUT: 'Barang Keluar',
   STOCK_ADJUSTMENT: 'Penyesuaian Stok',
@@ -66,27 +66,40 @@ export default function AuditLogClient({ logs, totalCount, page, pageSize, actio
 
   return (
     <div>
-      <div className="mb-4 flex gap-3">
-        <select
-          id="filter-action"
-          value={actionFilter}
-          className="input w-56"
-          onChange={(e) => updateParam('action', e.target.value)}
-          aria-label="Filter jenis aksi"
-        >
-          <option value="">Semua Aksi</option>
-          {Object.entries(ACTION_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
-          ))}
-        </select>
-        <button type="button" className="btn-secondary" onClick={() => router.push(pathname)}>
-          Reset
-        </button>
+      <div className="mb-4">
+        <div className="flex gap-3">
+          <select
+            id="filter-action"
+            value={actionFilter}
+            className="input w-56"
+            onChange={(e) => updateParam('action', e.target.value)}
+            aria-label="Filter jenis aksi"
+          >
+            <option value="">Semua Aksi</option>
+            {Object.entries(ACTION_LABELS)
+              .filter(([key]) => key !== 'EXCEL_IMPORT')
+              .map(([key, label]) => (
+                <option key={key} value={key}>{label}</option>
+              ))}
+          </select>
+          <button type="button" className="btn-secondary" onClick={() => router.push(pathname)}>
+            Reset
+          </button>
+        </div>
+        {actionFilter === 'STOCK_INITIAL' && (
+          <p className="mt-2 text-xs text-slate-500 dark:text-slate-400">
+            Stok yang pertama kali dicatat ketika barang mulai digunakan dalam sistem.
+          </p>
+        )}
       </div>
 
       {logs.length === 0 ? (
         <div className="card py-12 text-center text-slate-500 dark:text-slate-400">
-          <p>Tidak ada log ditemukan.</p>
+          <p>
+            {actionFilter
+              ? `Belum ada riwayat untuk aksi ${ACTION_LABELS[actionFilter] ?? actionFilter}.`
+              : 'Belum ada riwayat audit.'}
+          </p>
         </div>
       ) : (
         <div className="table-container">
