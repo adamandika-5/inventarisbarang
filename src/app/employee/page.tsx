@@ -164,7 +164,7 @@ export default async function EmployeeDashboardPage() {
                       <span className="inline-block rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
                         KELUAR
                       </span>
-                      <span className="font-mono text-xs font-medium text-slate-500 dark:text-slate-400">{tx.transaction_number}</span>
+                      <span className="font-mono text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap">{tx.transaction_number}</span>
                     </div>
                     <p className="mt-1 text-sm font-medium text-slate-900 dark:text-white">{item?.name ?? '—'}</p>
                     <p className="text-xs text-slate-500 dark:text-slate-400">

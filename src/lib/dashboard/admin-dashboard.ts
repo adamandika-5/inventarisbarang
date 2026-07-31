@@ -19,6 +19,8 @@
 
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz'
 import {
+  addMonths,
+  addYears,
   startOfMonth,
   subDays,
   startOfDay,
@@ -228,6 +230,84 @@ export function getJakartaActivityRange(
   )
 
   return { startIso, endIso }
+}
+
+// ── getJakartaOutgoingRanges ───────────────────────────────────────────────────
+
+export interface OutgoingRanges {
+  monthStartIso: string
+  nextMonthStartIso: string
+  yearStartIso: string
+  nextYearStartIso: string
+}
+
+/**
+ * Compute the half-open ISO date query bounds in WIB for outgoing stock metrics.
+ * - Month: [1st of current WIB month 00:00:00, 1st of next WIB month 00:00:00)
+ * - Year : [1st of Jan current WIB year 00:00:00, 1st of Jan next WIB year 00:00:00)
+ */
+export function getJakartaOutgoingRanges(
+  referenceDate: Date = new Date(),
+): OutgoingRanges {
+  const jakartaNow = toZonedTime(referenceDate, JAKARTA_TIME_ZONE)
+
+  const monthStartJakarta = startOfMonth(jakartaNow)
+  const nextMonthStartJakarta = startOfMonth(addMonths(jakartaNow, 1))
+
+  const yearStartJakarta = startOfYear(jakartaNow)
+  const nextYearStartJakarta = startOfYear(addYears(jakartaNow, 1))
+
+  const monthStartIso = formatInTimeZone(
+    monthStartJakarta,
+    JAKARTA_TIME_ZONE,
+    "yyyy-MM-dd'T'HH:mm:ssxxx",
+  )
+  const nextMonthStartIso = formatInTimeZone(
+    nextMonthStartJakarta,
+    JAKARTA_TIME_ZONE,
+    "yyyy-MM-dd'T'HH:mm:ssxxx",
+  )
+
+  const yearStartIso = formatInTimeZone(
+    yearStartJakarta,
+    JAKARTA_TIME_ZONE,
+    "yyyy-MM-dd'T'HH:mm:ssxxx",
+  )
+  const nextYearStartIso = formatInTimeZone(
+    nextYearStartJakarta,
+    JAKARTA_TIME_ZONE,
+    "yyyy-MM-dd'T'HH:mm:ssxxx",
+  )
+
+  return {
+    monthStartIso,
+    nextMonthStartIso,
+    yearStartIso,
+    nextYearStartIso,
+  }
+}
+
+// ── summarizeOutgoingStock ─────────────────────────────────────────────────────
+
+export interface OutgoingTransactionRow {
+  base_quantity?: number | bigint | string | null
+}
+
+/**
+ * Sum normalized base quantity for outgoing transactions.
+ * Ignores invalid/negative/non-numeric values.
+ */
+export function summarizeOutgoingStock(
+  rows: OutgoingTransactionRow[],
+): number {
+  let total = 0
+  for (const row of rows) {
+    const val = Number(row.base_quantity)
+    if (Number.isFinite(val) && val > 0) {
+      total += val
+    }
+  }
+  return total
 }
 
 // ── Shared internal types ──────────────────────────────────────────────────────

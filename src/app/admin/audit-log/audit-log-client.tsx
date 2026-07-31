@@ -27,6 +27,20 @@ const dtf = new Intl.DateTimeFormat('id-ID', {
   timeZone: 'Asia/Jakarta',
 })
 
+const ENTITY_TYPE_LABELS: Record<string, string> = {
+  stock_transactions: 'Transaksi Stok',
+  items: 'Barang',
+  units: 'Satuan',
+  categories: 'Kategori',
+  users: 'Pengguna',
+  profiles: 'Pengguna',
+  settings: 'Pengaturan',
+}
+
+function formatEntityType(entityType: string): string {
+  return ENTITY_TYPE_LABELS[entityType] ?? entityType
+}
+
 const ACTION_LABELS: Record<string, string> = {
   USER_CREATED: 'Pengguna Dibuat',
   USER_DEACTIVATED: 'Pengguna Dinonaktifkan',
@@ -51,28 +65,60 @@ const ACTION_LABELS: Record<string, string> = {
   SETTINGS_UPDATED: 'Pengaturan Diperbarui',
 }
 
-export default function AuditLogClient({ logs, totalCount, page, pageSize, actionFilter }: AuditLogClientProps) {
+export default function AuditLogClient({
+  logs,
+  totalCount,
+  page,
+  pageSize,
+  actionFilter,
+}: AuditLogClientProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
-  const totalPages = Math.ceil(totalCount / pageSize)
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
 
-  const updateParam = (key: string, value: string) => {
+  /** Navigate to a page, keeping the current action filter */
+  const goToPage = (targetPage: number) => {
     const p = new URLSearchParams(searchParams.toString())
-    if (value) p.set(key, value); else p.delete(key)
+    p.set('page', String(targetPage))
+    router.push(`${pathname}?${p.toString()}`)
+  }
+
+  /** Change action filter and reset to page 1 */
+  const setActionFilter = (value: string) => {
+    const p = new URLSearchParams(searchParams.toString())
+    if (value) p.set('action', value)
+    else p.delete('action')
     p.set('page', '1')
     router.push(`${pathname}?${p.toString()}`)
   }
 
+  /** Reset all filters and go to page 1 */
+  const resetFilters = () => {
+    router.push(pathname)
+  }
+
+  // Range info: "Menampilkan 1–20 dari 87 aktivitas"
+  const rangeStart = totalCount === 0 ? 0 : (page - 1) * pageSize + 1
+  const rangeEnd = Math.min(page * pageSize, totalCount)
+
+  // Build compact page-number list with ellipsis
+  const WINDOW = 2
+  const pgStart = Math.max(1, page - WINDOW)
+  const pgEnd = Math.min(totalPages, page + WINDOW)
+  const pageNumbers: number[] = []
+  for (let i = pgStart; i <= pgEnd; i++) pageNumbers.push(i)
+
   return (
     <div>
+      {/* Filter bar */}
       <div className="mb-4">
         <div className="flex gap-3">
           <select
             id="filter-action"
             value={actionFilter}
             className="input w-56"
-            onChange={(e) => updateParam('action', e.target.value)}
+            onChange={(e) => setActionFilter(e.target.value)}
             aria-label="Filter jenis aksi"
           >
             <option value="">Semua Aksi</option>
@@ -82,7 +128,12 @@ export default function AuditLogClient({ logs, totalCount, page, pageSize, actio
                 <option key={key} value={key}>{label}</option>
               ))}
           </select>
-          <button type="button" className="btn-secondary" onClick={() => router.push(pathname)}>
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={resetFilters}
+            aria-label="Reset filter"
+          >
             Reset
           </button>
         </div>
@@ -93,9 +144,10 @@ export default function AuditLogClient({ logs, totalCount, page, pageSize, actio
         )}
       </div>
 
+      {/* Empty state */}
       {logs.length === 0 ? (
         <div className="card py-12 text-center text-slate-500 dark:text-slate-400">
-          <p>
+          <p className="text-base font-medium">
             {actionFilter
               ? `Belum ada riwayat untuk aksi ${ACTION_LABELS[actionFilter] ?? actionFilter}.`
               : 'Belum ada riwayat audit.'}
@@ -106,7 +158,7 @@ export default function AuditLogClient({ logs, totalCount, page, pageSize, actio
           <table className="table" aria-label="Audit log">
             <thead>
               <tr>
-                <th scope="col">Waktu</th>
+                <th scope="col" className="whitespace-nowrap">Waktu</th>
                 <th scope="col">Aksi</th>
                 <th scope="col">Entitas</th>
                 <th scope="col">Oleh</th>
@@ -120,13 +172,12 @@ export default function AuditLogClient({ logs, totalCount, page, pageSize, actio
                     {dtf.format(new Date(log.performed_at))}
                   </td>
                   <td>
-                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">{ACTION_LABELS[log.action] ?? log.action}</span>
+                    <span className="text-sm font-medium text-slate-900 dark:text-slate-100">
+                      {ACTION_LABELS[log.action] ?? log.action}
+                    </span>
                   </td>
                   <td className="text-sm text-slate-600 dark:text-slate-300">
-                    {log.entity_type}
-                    {log.entity_id && (
-                      <div className="font-mono text-xs text-slate-400 dark:text-slate-500">{log.entity_id.slice(0, 8)}…</div>
-                    )}
+                    {formatEntityType(log.entity_type)}
                   </td>
                   <td className="text-sm text-slate-900 dark:text-slate-100">
                     {log.profiles?.full_name ?? log.profiles?.username ?? 'Sistem'}
@@ -139,16 +190,98 @@ export default function AuditLogClient({ logs, totalCount, page, pageSize, actio
         </div>
       )}
 
-      {totalPages > 1 && (
-        <nav className="mt-4 flex items-center justify-between">
-          <p className="text-sm text-slate-600 dark:text-slate-300">Halaman {page} dari {totalPages} ({totalCount} entri)</p>
-          <div className="flex gap-2">
-            <button type="button" className="btn-secondary text-sm"
-              onClick={() => updateParam('page', String(page - 1))} disabled={page <= 1}>
+      {/* Pagination — shown whenever there is data */}
+      {totalCount > 0 && (
+        <nav
+          className="mt-4 flex flex-wrap items-center justify-between gap-3"
+          aria-label="Navigasi halaman audit log"
+        >
+          {/* Count info */}
+          <p className="text-sm text-slate-600 dark:text-slate-300">
+            Menampilkan{' '}
+            <span className="font-semibold text-slate-900 dark:text-slate-100">
+              {rangeStart}–{rangeEnd}
+            </span>{' '}
+            dari{' '}
+            <span className="font-semibold text-slate-900 dark:text-slate-100">{totalCount}</span>{' '}
+            aktivitas
+          </p>
+
+          {/* Page controls */}
+          <div className="flex flex-wrap items-center gap-1">
+            {/* Previous */}
+            <button
+              id="btn-prev-page-auditlog"
+              type="button"
+              className="btn-secondary text-sm"
+              onClick={() => goToPage(page - 1)}
+              disabled={page <= 1}
+              aria-label="Halaman sebelumnya"
+            >
               &laquo; Sebelumnya
             </button>
-            <button type="button" className="btn-secondary text-sm"
-              onClick={() => updateParam('page', String(page + 1))} disabled={page >= totalPages}>
+
+            {/* First page + leading ellipsis */}
+            {pgStart > 1 && (
+              <>
+                <button
+                  type="button"
+                  className="btn-secondary text-sm min-w-[2rem]"
+                  onClick={() => goToPage(1)}
+                  aria-label="Halaman 1"
+                >
+                  1
+                </button>
+                {pgStart > 2 && (
+                  <span className="select-none px-1 text-slate-400 dark:text-slate-500">…</span>
+                )}
+              </>
+            )}
+
+            {/* Page number window */}
+            {pageNumbers.map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={() => goToPage(n)}
+                aria-label={`Halaman ${n}`}
+                aria-current={n === page ? 'page' : undefined}
+                className={
+                  n === page
+                    ? 'min-w-[2rem] rounded-md px-3 py-1.5 text-sm font-bold shadow-sm bg-blue-600 text-white dark:bg-[#22D3EE] dark:text-slate-900'
+                    : 'btn-secondary text-sm min-w-[2rem]'
+                }
+              >
+                {n}
+              </button>
+            ))}
+
+            {/* Trailing ellipsis + last page */}
+            {pgEnd < totalPages && (
+              <>
+                {pgEnd < totalPages - 1 && (
+                  <span className="select-none px-1 text-slate-400 dark:text-slate-500">…</span>
+                )}
+                <button
+                  type="button"
+                  className="btn-secondary text-sm min-w-[2rem]"
+                  onClick={() => goToPage(totalPages)}
+                  aria-label={`Halaman ${totalPages}`}
+                >
+                  {totalPages}
+                </button>
+              </>
+            )}
+
+            {/* Next */}
+            <button
+              id="btn-next-page-auditlog"
+              type="button"
+              className="btn-secondary text-sm"
+              onClick={() => goToPage(page + 1)}
+              disabled={page >= totalPages}
+              aria-label="Halaman berikutnya"
+            >
               Berikutnya &raquo;
             </button>
           </div>

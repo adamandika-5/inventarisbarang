@@ -13,9 +13,9 @@ export default async function StockOutPage({
 }) {
   const supabase = await createSupabaseServerClient()
   const params = await searchParams
-  const page = Math.max(1, parseInt(params.page ?? '1', 10))
+  const page = Math.max(1, isNaN(parseInt(params.page ?? '1', 10)) ? 1 : parseInt(params.page ?? '1', 10))
   const search = params.search?.trim() ?? ''
-  const pageSize = 25
+  const pageSize = 10
 
   let query = supabase
     .from('stock_transactions')

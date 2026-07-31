@@ -1,20 +1,20 @@
 'use client'
 
 /**
- * StockInForm — form for recording stock-in transactions.
+ * StockInForm — form for recording stock-in transactions (quantity-only).
  *
  * Implements:
  * - Barcode/name item search
  * - Unit selection from item_units
- * - Quantity and price input
- * - Client-side moving average simulation (display only)
- * - idempotent client_request_id generation
+ * - Quantity input
+ * - Idempotent client_request_id generation
  * - Confirmation before submit
+ *
+ * Price: Not collected. System is quantity-only since migration 011.
  */
 
 import { useState, useTransition, useCallback, useRef } from 'react'
 import { processStockIn } from './actions'
-import { simulateMovingAverage } from '@/lib/inventory/stock'
 import ItemSearchInput from '@/components/item-search-input'
 
 interface UnitOption {
@@ -48,7 +48,6 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
   const [selectedUnit, setSelectedUnit] = useState<UnitOption | null>(null)
   const [quantity, setQuantity] = useState<string>('1')
   const [quantityError, setQuantityError] = useState<string | null>(null)
-  const [price, setPrice] = useState('')
   const [showConfirm, setShowConfirm] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -90,7 +89,6 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
     setSelectedUnit(null)
     setQuantity('1')
     setQuantityError(null)
-    setPrice('')
     setShowConfirm(false)
     clientRequestIdRef.current = crypto.randomUUID()
   }
@@ -102,61 +100,9 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
     clientRequestIdRef.current = crypto.randomUUID() // reset idempotency key on unit change
   }
 
-  const handlePriceChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target
-    const val = input.value
-    const digits = val.replace(/\D/g, '')
-
-    if (digits && parseInt(digits, 10) > 1000000000000) {
-      return
-    }
-
-    const selectionStart = input.selectionStart ?? 0
-    const textBeforeCursor = val.substring(0, selectionStart)
-    const digitsBeforeCursor = textBeforeCursor.replace(/\D/g, '').length
-
-    setPrice(digits)
-
-    const formatted = digits ? new Intl.NumberFormat('id-ID').format(parseInt(digits, 10)) : ''
-
-    setTimeout(() => {
-      let newCursorPos = 0
-      let digitCount = 0
-      for (let i = 0; i < formatted.length; i++) {
-        if (/\d/.test(formatted[i]!)) {
-          digitCount++
-          if (digitCount === digitsBeforeCursor) {
-            newCursorPos = i + 1
-            break
-          }
-        }
-      }
-      if (newCursorPos === 0 && digitsBeforeCursor > 0) {
-        newCursorPos = formatted.length
-      }
-      input.setSelectionRange(newCursorPos, newCursorPos)
-    }, 0)
-  }
-
   const parsedQty = Number(quantity)
   const isQtyValid = quantity !== '' && Number.isInteger(parsedQty) && parsedQty >= 1
-
-  const priceNum = parseInt(price, 10) || 0
-  const simulation = selectedItem && selectedUnit && isQtyValid && priceNum > 0
-    ? simulateMovingAverage(
-        Number(selectedItem.current_stock),
-        0, // We don't have current inventory value client-side (price is private)
-        parsedQty,
-        selectedUnit.conversion_factor,
-        priceNum,
-      )
-    : null
-
   const baseQuantity = selectedUnit && isQtyValid ? parsedQty * selectedUnit.conversion_factor : 0
-  const totalCost = priceNum > 0 && isQtyValid ? parsedQty * priceNum : 0
-
-  const formatRp = (val: number) =>
-    new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(val)
 
   const handleConfirm = () => {
     setShowConfirm(false)
@@ -177,7 +123,6 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
         setSelectedUnit(null)
         setQuantity('1')
         setQuantityError(null)
-        setPrice('')
         formRef.current?.reset()
         clientRequestIdRef.current = crypto.randomUUID()
       } else {
@@ -212,7 +157,6 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
         <input type="hidden" name="client_request_id" value={clientRequestIdRef.current} />
         <input type="hidden" name="item_id" value={selectedItem?.id ?? ''} />
         <input type="hidden" name="unit_id" value={selectedUnit?.id ?? ''} />
-        <input type="hidden" name="transaction_unit_price" value={price} />
 
         <div className="card space-y-5">
           {/* Item search */}
@@ -280,6 +224,12 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
                       setQuantityError(null)
                     }
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                      e.preventDefault()
+                    }
+                  }}
+                  onWheel={(e) => e.currentTarget.blur()}
                   className={`input ${quantityError ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
                 />
                 {quantityError && (
@@ -292,55 +242,21 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
                 )}
               </div>
 
-              {/* Price */}
-              <div>
-                <label htmlFor="stock-in-price" className="label mb-1">
-                  Harga per {selectedUnit?.symbol ?? 'satuan'} <span className="text-red-500">*</span>
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500 dark:text-slate-400">Rp</span>
-                  <input
-                    id="stock-in-price"
-                    type="text"
-                    inputMode="numeric"
-                    required
-                    value={price ? new Intl.NumberFormat('id-ID').format(parseInt(price, 10)) : ''}
-                    onChange={handlePriceChange}
-                    onKeyDown={(e) => {
-                      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                        e.preventDefault()
-                      }
-                    }}
-                    onWheel={(e) => e.currentTarget.blur()}
-                    placeholder="0"
-                    className="input pl-9"
-                  />
-                </div>
-                {totalCost > 0 && (
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    Total: {formatRp(totalCost)}
-                  </p>
-                )}
-              </div>
-
-              {/* Simulation summary */}
-              {simulation && (
+              {/* Quantity summary */}
+              {selectedUnit && isQtyValid && (
                 <div className="rounded-md bg-slate-50 dark:bg-[#0B1220] border border-slate-200 dark:border-white/10 p-3 text-sm">
-                  <p className="font-medium text-slate-700 dark:text-white">Ringkasan Transaksi (Simulasi)</p>
+                  <p className="font-medium text-slate-700 dark:text-white">Ringkasan Transaksi</p>
                   <div className="mt-2 space-y-1 text-slate-600 dark:text-slate-300">
                     <div className="flex justify-between">
                       <span>Jumlah (satuan dasar)</span>
-                      <span>{simulation.baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span>Total pembelian</span>
-                      <span>{formatRp(simulation.purchaseValue)}</span>
+                      <span>{baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</span>
                     </div>
                     <div className="flex justify-between">
                       <span>Perkiraan stok baru</span>
-                      <span className="font-medium text-slate-900 dark:text-white">{simulation.newStock.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</span>
+                      <span className="font-medium text-slate-900 dark:text-white">
+                        {(Number(selectedItem.current_stock) + baseQuantity).toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}
+                      </span>
                     </div>
-                    <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">* Harga rata-rata baru dihitung ulang oleh server.</p>
                   </div>
                 </div>
               )}
@@ -357,7 +273,6 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
               setSelectedUnit(null)
               setQuantity('1')
               setQuantityError(null)
-              setPrice('')
             }}
             disabled={isPending}
           >
@@ -367,7 +282,7 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
             id="btn-konfirmasi-barang-masuk"
             type="submit"
             className="btn-primary"
-            disabled={isPending || !selectedItem || !selectedUnit || !isQtyValid || !price}
+            disabled={isPending || !selectedItem || !selectedUnit || !isQtyValid}
           >
             {isPending ? 'Memproses…' : 'Konfirmasi Barang Masuk'}
           </button>
@@ -389,8 +304,8 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
             <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-300">
               <p><span className="font-medium">Barang:</span> {selectedItem.name}</p>
               <p><span className="font-medium">Jumlah:</span> {parsedQty} {selectedUnit.symbol} = {baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
-              <p><span className="font-medium">Harga per {selectedUnit.symbol}:</span> {formatRp(parseFloat(price) || 0)}</p>
-              <p><span className="font-medium">Total:</span> {formatRp(totalCost)}</p>
+              <p><span className="font-medium">Stok sekarang:</span> {Number(selectedItem.current_stock).toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
+              <p><span className="font-medium">Stok setelah:</span> {(Number(selectedItem.current_stock) + baseQuantity).toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
             </div>
             <div className="mt-5 flex justify-end gap-3">
               <button

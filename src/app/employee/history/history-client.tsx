@@ -80,9 +80,9 @@ export default function EmployeeHistoryClient({
                         ;(e.currentTarget as HTMLElement).style.backgroundColor = 'var(--bg-table-row)'
                       }}
                     >
-                      <td className="px-4 py-3">
+                      <td className="px-4 py-3 whitespace-nowrap">
                         <code
-                          className="rounded px-1.5 py-0.5 font-mono text-xs font-medium"
+                          className="rounded px-1.5 py-0.5 font-mono text-xs font-medium whitespace-nowrap"
                           style={{ backgroundColor: 'var(--bg-code)', color: 'var(--text-code)' }}
                         >
                           {tx.transaction_number}

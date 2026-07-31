@@ -60,23 +60,16 @@ export interface SummaryRowItem {
   categoryName: string
   baseUnitSymbol: string
   saldoAwalQty: number
-  nilaiAwal: number
   mutasiMasuk: number
   mutasiKeluar: number
   mutasiJumlah: number
   saldoAkhirQty: number
-  nilaiAkhir: number
-  hargaRataRataCurrent?: number | null
-  nilaiPersediaanCurrent?: number | null
-  statusPenilaian?: string
 }
 
 export interface CategorySummaryGroup {
   categoryId: string
   categoryName: string
   items: SummaryRowItem[]
-  subtotalNilaiAwal: number
-  subtotalNilaiAkhir: number
 }
 
 export interface InventoryReportData {
@@ -86,12 +79,10 @@ export interface InventoryReportData {
   dateToWib: string
   generatedAtWib: string
   categories: CategorySummaryGroup[]
-  grandTotalNilaiAwal: number
-  grandTotalNilaiAkhir: number
 }
 
 /**
- * Compiles report data for "Laporan Rincian Barang Persediaan".
+ * Compiles report data for "Laporan Rincian Barang Persediaan" (Quantity-only).
  */
 export async function compileInventoryReportData(
   supabase: SupabaseClient<Database>,
@@ -133,7 +124,6 @@ export async function compileInventoryReportData(
   const items = itemsData || []
 
   // 4. Fetch stock transactions up to endUtcIso
-  const adminSupabase = supabase
   const { data: transactionsData } = await supabase
     .from('stock_transactions')
     .select('id, item_id, transaction_type, input_quantity, base_quantity, quantity_delta, stock_before, stock_after, transaction_at, is_reversed, original_transaction_id')
@@ -141,47 +131,6 @@ export async function compileInventoryReportData(
     .order('transaction_at', { ascending: true })
 
   const allTransactions = transactionsData || []
-
-  // 5. Fetch transaction cost snapshots via get_stock_transaction_costs RPC
-  const txCostMap: Record<string, { inventory_value_after: number }> = {}
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: costsData, error: costsErr } = await (adminSupabase as any).rpc('get_stock_transaction_costs')
-  if (costsErr) {
-    if (costsErr.code === 'PGRST202' || costsErr.message?.includes('Could not find the function')) {
-      throw new Error(
-        'Migration 008_get_stock_transaction_costs_rpc.sql belum diterapkan. Data harga historis belum dapat diverifikasi.',
-      )
-    }
-    throw new Error(`Gagal mengambil data harga historis: ${costsErr.message}`)
-  }
-  if (costsData && Array.isArray(costsData)) {
-    for (const c of costsData) {
-      txCostMap[c.transaction_id] = {
-        inventory_value_after: parseFloat(String(c.inventory_value_after || '0')),
-      }
-    }
-  }
-
-  // 6. Fetch current item costs via get_item_costs RPC
-  const itemCostMap: Record<string, { average_cost: number; inventory_value: number }> = {}
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: itemCostsData, error: itemCostsErr } = await (adminSupabase as any).rpc('get_item_costs')
-  if (itemCostsErr) {
-    if (itemCostsErr.code === 'PGRST202' || itemCostsErr.message?.includes('Could not find the function')) {
-      throw new Error(
-        'Migration 008_get_stock_transaction_costs_rpc.sql belum diterapkan. Data harga historis belum dapat diverifikasi.',
-      )
-    }
-    throw new Error(`Gagal mengambil data harga rata-rata persediaan: ${itemCostsErr.message}`)
-  }
-  if (itemCostsData && Array.isArray(itemCostsData)) {
-    for (const ic of itemCostsData) {
-      itemCostMap[ic.item_id] = {
-        average_cost: parseFloat(String(ic.average_cost || '0')),
-        inventory_value: parseFloat(String(ic.inventory_value || '0')),
-      }
-    }
-  }
 
   // Group transactions by item_id
   const itemTxMap: Record<string, typeof allTransactions> = {}
@@ -196,7 +145,7 @@ export async function compileInventoryReportData(
 
   for (const item of items) {
     const txs = itemTxMap[item.id] || []
-    
+
     // Transactions before startUtcIso
     const txsBefore = txs.filter((t) => t.transaction_at < startUtcIso)
     // Transactions during [startUtcIso, endUtcIso]
@@ -204,14 +153,12 @@ export async function compileInventoryReportData(
       (t) => t.transaction_at >= startUtcIso && t.transaction_at <= endUtcIso
     )
 
-    // Saldo Awal Qty & Nilai Awal
+    // Saldo Awal Qty
     let saldoAwalQty = 0
-    let nilaiAwal = 0
     if (txsBefore.length > 0) {
       const lastTxBefore = txsBefore[txsBefore.length - 1]
       if (lastTxBefore) {
         saldoAwalQty = Number(lastTxBefore.stock_after ?? 0)
-        nilaiAwal = txCostMap[lastTxBefore.id]?.inventory_value_after ?? 0
       }
     }
 
@@ -238,32 +185,7 @@ export async function compileInventoryReportData(
 
     const mutasiJumlah = mutasiMasuk - mutasiKeluar
     const saldoAkhirQty = saldoAwalQty + mutasiJumlah
-
-    // Saldo Akhir Rp (Nilai Akhir)
-    let nilaiAkhir = 0
-    if (txs.length > 0) {
-      const lastTxAll = txs[txs.length - 1]
-      if (lastTxAll) {
-        nilaiAkhir = txCostMap[lastTxAll.id]?.inventory_value_after ?? 0
-      }
-    }
-
-    // Determine current Valuation Status
     const curStock = Number(item.current_stock ?? saldoAkhirQty)
-    const ic = itemCostMap[item.id]
-    let statusPenilaian = 'Normal'
-    let hargaRataRataCurrent: number | null = ic?.average_cost ?? null
-    let nilaiPersediaanCurrent: number | null = ic?.inventory_value ?? nilaiAkhir
-
-    if (curStock === 0) {
-      statusPenilaian = 'Stok Habis'
-      hargaRataRataCurrent = 0
-      nilaiPersediaanCurrent = 0
-    } else if (!ic) {
-      statusPenilaian = 'Penilaian Belum Tersedia'
-      hargaRataRataCurrent = null
-      nilaiPersediaanCurrent = null
-    }
 
     // Include item if active OR has non-zero balances/mutations
     const hasActivity =
@@ -280,72 +202,51 @@ export async function compileInventoryReportData(
         id: item.id,
         sku: item.sku,
         name: item.name,
-        categoryName: catObj?.name || 'Lainnya',
-        baseUnitSymbol: baseUnitObj?.symbol || 'pcs',
+        categoryName: catObj?.name ?? 'Tanpa Kategori',
+        baseUnitSymbol: baseUnitObj?.symbol ?? 'unit',
         saldoAwalQty,
-        nilaiAwal: Math.max(0, nilaiAwal),
         mutasiMasuk,
         mutasiKeluar,
         mutasiJumlah,
         saldoAkhirQty,
-        nilaiAkhir: Math.max(0, nilaiAkhir),
-        hargaRataRataCurrent,
-        nilaiPersediaanCurrent,
-        statusPenilaian,
       })
     }
   }
 
-  // Create Category Map
-  const catMap: Record<string, CategorySummaryGroup> = {}
+  // Group by category
+  const categoriesMap: Record<string, CategorySummaryGroup> = {}
 
-  // Initialize known categories
   for (const cat of categoryList) {
-    catMap[cat.id] = {
+    categoriesMap[cat.id] = {
       categoryId: cat.id,
       categoryName: cat.name,
       items: [],
-      subtotalNilaiAwal: 0,
-      subtotalNilaiAkhir: 0,
     }
   }
 
-  // Fallback category for uncategorized
-  const uncategorizedId = 'uncategorized'
-  catMap[uncategorizedId] = {
-    categoryId: uncategorizedId,
+  const uncategorizedKey = 'uncategorized'
+  categoriesMap[uncategorizedKey] = {
+    categoryId: uncategorizedKey,
     categoryName: 'Tanpa Kategori',
     items: [],
-    subtotalNilaiAwal: 0,
-    subtotalNilaiAkhir: 0,
   }
 
-  // Group items into categories
-  for (const summary of itemSummaries) {
-    const itemObj = items.find((i) => i.id === summary.id)
-    const catId = itemObj?.category_id && catMap[itemObj.category_id] ? itemObj.category_id : uncategorizedId
-    const targetGroup = catMap[catId]
-    if (targetGroup) {
-      targetGroup.items.push(summary)
-      targetGroup.subtotalNilaiAwal += summary.nilaiAwal
-      targetGroup.subtotalNilaiAkhir += summary.nilaiAkhir
+  for (const itemSummary of itemSummaries) {
+    const itemObj = items.find((i) => i.id === itemSummary.id)
+    const catId = itemObj?.category_id || uncategorizedKey
+    if (!categoriesMap[catId]) {
+      categoriesMap[catId] = {
+        categoryId: catId,
+        categoryName: itemSummary.categoryName,
+        items: [],
+      }
     }
+    const grp = categoriesMap[catId]!
+    grp.items.push(itemSummary)
   }
 
-  // Filter out empty categories and build ordered list
-  const categoryGroups: CategorySummaryGroup[] = []
-  let grandTotalNilaiAwal = 0
-  let grandTotalNilaiAkhir = 0
-
-  for (const catId of Object.keys(catMap)) {
-    const group = catMap[catId]
-    if (group && group.items.length > 0) {
-      group.items.sort((a, b) => a.sku.localeCompare(b.sku))
-      categoryGroups.push(group)
-      grandTotalNilaiAwal += group.subtotalNilaiAwal
-      grandTotalNilaiAkhir += group.subtotalNilaiAkhir
-    }
-  }
+  // Filter categories with items
+  const finalCategories = Object.values(categoriesMap).filter((c) => c.items.length > 0)
 
   return {
     institutionName,
@@ -353,24 +254,22 @@ export async function compileInventoryReportData(
     dateFromWib: dateFromStr,
     dateToWib: dateToStr,
     generatedAtWib: nowWibStr,
-    categories: categoryGroups,
-    grandTotalNilaiAwal,
-    grandTotalNilaiAkhir,
+    categories: finalCategories,
   }
 }
 
 /**
- * Builds the Excel Workbook for "Laporan Rincian Barang Persediaan".
+ * Builds Excel workbook from InventoryReportData (Quantity-only).
  */
 export async function buildInventoryReportWorkbook(
-  reportData: InventoryReportData
+  reportData: InventoryReportData,
 ): Promise<Buffer> {
   const workbook = new ExcelJS.Workbook()
   workbook.creator = 'InventarisBarang'
   workbook.created = new Date()
 
   const worksheet = workbook.addWorksheet('Rincian Persediaan', {
-    views: [{ state: 'frozen', ySplit: 7 }],
+    views: [{ state: 'frozen', ySplit: 5 }],
   })
 
   worksheet.pageSetup = {
@@ -387,13 +286,9 @@ export async function buildInventoryReportWorkbook(
     { width: 34 }, // C: Nama Barang
     { width: 18 }, // D: Satuan
     { width: 16 }, // E: Saldo Awal Qty
-    { width: 22 }, // F: Saldo Awal Rp
-    { width: 16 }, // G: Mutasi Masuk Qty
-    { width: 16 }, // H: Mutasi Keluar Qty
-    { width: 18 }, // I: Saldo Akhir Qty
-    { width: 22 }, // J: Harga Rata-Rata Persediaan Saat Ini
-    { width: 24 }, // K: Nilai Persediaan Saat Ini
-    { width: 22 }, // L: Status Penilaian
+    { width: 16 }, // F: Mutasi Masuk Qty
+    { width: 16 }, // G: Mutasi Keluar Qty
+    { width: 18 }, // H: Saldo Akhir Qty
   ]
 
   const thinBorder = {
@@ -403,31 +298,29 @@ export async function buildInventoryReportWorkbook(
     right: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
   }
 
-  const currencyFormat = '"Rp"#,##0;[Red]("-Rp"#,##0);"-"'
-
   // Header Title Block (Rows 1-4)
-  worksheet.mergeCells('A1:L1')
+  worksheet.mergeCells('A1:H1')
   const r1 = worksheet.getRow(1)
   r1.getCell(1).value = reportData.institutionName
   r1.getCell(1).font = { name: 'Calibri', size: 16, bold: true, color: { argb: 'FF1E293B' } }
   r1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
   r1.height = 28
 
-  worksheet.mergeCells('A2:L2')
+  worksheet.mergeCells('A2:H2')
   const r2 = worksheet.getRow(2)
   r2.getCell(1).value = reportData.reportHeaderText
   r2.getCell(1).font = { name: 'Calibri', size: 13, bold: true, color: { argb: 'FF334155' } }
   r2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
   r2.height = 22
 
-  worksheet.mergeCells('A3:L3')
+  worksheet.mergeCells('A3:H3')
   const r3 = worksheet.getRow(3)
   r3.getCell(1).value = `Periode: ${formatIndonesianDateStr(reportData.dateFromWib)} s/d ${formatIndonesianDateStr(reportData.dateToWib)}`
   r3.getCell(1).font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF475569' } }
   r3.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
   r3.height = 18
 
-  worksheet.mergeCells('A4:L4')
+  worksheet.mergeCells('A4:H4')
   const r4 = worksheet.getRow(4)
   r4.getCell(1).value = `Dibuat pada: ${reportData.generatedAtWib}`
   r4.getCell(1).font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF64748B' } }
@@ -445,16 +338,12 @@ export async function buildInventoryReportWorkbook(
     'Nama Barang',
     'Satuan',
     'Saldo Awal (Qty)',
-    'Saldo Awal (Rp)',
     'Mutasi Masuk (Qty)',
     'Mutasi Keluar (Qty)',
     'Saldo Akhir (Qty)',
-    'Harga Rata-Rata Persediaan',
-    'Nilai Persediaan Saat Ini',
-    'Status Penilaian',
   ]
 
-  for (let c = 1; c <= 12; c++) {
+  for (let c = 1; c <= 8; c++) {
     const cell = hRow.getCell(c)
     cell.value = headers[c - 1]
     cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FFFFFFFF' } }
@@ -468,7 +357,7 @@ export async function buildInventoryReportWorkbook(
 
   for (const catGroup of reportData.categories) {
     // Category Header Row
-    worksheet.mergeCells(`A${rowIdx}:L${rowIdx}`)
+    worksheet.mergeCells(`A${rowIdx}:H${rowIdx}`)
     const catRow = worksheet.getRow(rowIdx)
     catRow.height = 22
     const catCell = catRow.getCell(1)
@@ -476,7 +365,7 @@ export async function buildInventoryReportWorkbook(
     catCell.font = { name: 'Calibri', size: 10.5, bold: true, color: { argb: 'FFFFFFFF' } }
     catCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF334155' } }
     catCell.alignment = { horizontal: 'left', vertical: 'middle', indent: 1 }
-    for (let c = 1; c <= 12; c++) {
+    for (let c = 1; c <= 8; c++) {
       catRow.getCell(c).border = thinBorder
     }
     rowIdx++
@@ -497,48 +386,16 @@ export async function buildInventoryReportWorkbook(
       row.getCell(5).value = item.saldoAwalQty
       row.getCell(5).numFmt = '#,##0'
 
-      row.getCell(6).value = item.nilaiAwal
-      row.getCell(6).numFmt = currencyFormat
+      row.getCell(6).value = item.mutasiMasuk
+      row.getCell(6).numFmt = '#,##0'
 
-      row.getCell(7).value = item.mutasiMasuk
+      row.getCell(7).value = item.mutasiKeluar
       row.getCell(7).numFmt = '#,##0'
 
-      row.getCell(8).value = item.mutasiKeluar
+      row.getCell(8).value = item.saldoAkhirQty
       row.getCell(8).numFmt = '#,##0'
 
-      row.getCell(9).value = item.saldoAkhirQty
-      row.getCell(9).numFmt = '#,##0'
-
-      // Col 10: Harga Rata-Rata Persediaan Saat Ini
-      const c10 = row.getCell(10)
-      if (item.hargaRataRataCurrent !== null && item.hargaRataRataCurrent !== undefined) {
-        c10.value = item.hargaRataRataCurrent
-        c10.numFmt = currencyFormat
-      } else {
-        c10.value = '—'
-        c10.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF94A3B8' } }
-      }
-
-      // Col 11: Nilai Persediaan Saat Ini
-      const c11 = row.getCell(11)
-      if (item.nilaiPersediaanCurrent !== null && item.nilaiPersediaanCurrent !== undefined) {
-        c11.value = item.nilaiPersediaanCurrent
-        c11.numFmt = currencyFormat
-      } else {
-        c11.value = '—'
-        c11.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF94A3B8' } }
-      }
-
-      // Col 12: Status Penilaian
-      const c12 = row.getCell(12)
-      c12.value = item.statusPenilaian || 'Normal'
-      if (item.statusPenilaian === 'Stok Habis') {
-        c12.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF64748B' } }
-      } else if (item.statusPenilaian === 'Penilaian Belum Tersedia') {
-        c12.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FFC2410C' } }
-      }
-
-      for (let c = 1; c <= 12; c++) {
+      for (let c = 1; c <= 8; c++) {
         const cell = row.getCell(c)
         cell.border = thinBorder
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
@@ -546,9 +403,9 @@ export async function buildInventoryReportWorkbook(
           cell.font = { name: 'Calibri', size: 9.5, color: { argb: 'FF0F172A' } }
         }
 
-        if ([1, 2, 4, 12].includes(c)) {
+        if ([1, 2, 4].includes(c)) {
           cell.alignment = { horizontal: 'center', vertical: 'middle' }
-        } else if ([5, 6, 7, 8, 9, 10, 11].includes(c)) {
+        } else if ([5, 6, 7, 8].includes(c)) {
           cell.alignment = { horizontal: 'right', vertical: 'middle' }
         } else {
           cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }
@@ -556,54 +413,6 @@ export async function buildInventoryReportWorkbook(
       }
 
       rowIdx++
-    }
-
-    // Category Subtotal Row
-    const subRow = worksheet.getRow(rowIdx)
-    subRow.height = 22
-    subRow.getCell(3).value = `Subtotal ${catGroup.categoryName}`
-    subRow.getCell(6).value = catGroup.subtotalNilaiAwal
-    subRow.getCell(6).numFmt = currencyFormat
-    subRow.getCell(11).value = catGroup.subtotalNilaiAkhir
-    subRow.getCell(11).numFmt = currencyFormat
-
-    for (let c = 1; c <= 12; c++) {
-      const cell = subRow.getCell(c)
-      cell.font = { name: 'Calibri', size: 9.5, bold: true, color: { argb: 'FF0F172A' } }
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2E8F0' } }
-      cell.border = thinBorder
-      if (c === 6 || c === 11) {
-        cell.alignment = { horizontal: 'right', vertical: 'middle' }
-      } else {
-        cell.alignment = { horizontal: 'left', vertical: 'middle' }
-      }
-    }
-    rowIdx++
-  }
-
-  // Grand Total Row
-  const grandRow = worksheet.getRow(rowIdx)
-  grandRow.height = 24
-  grandRow.getCell(3).value = 'TOTAL KESELURUHAN PERSEDIAAN'
-  grandRow.getCell(6).value = reportData.grandTotalNilaiAwal
-  grandRow.getCell(6).numFmt = currencyFormat
-  grandRow.getCell(11).value = reportData.grandTotalNilaiAkhir
-  grandRow.getCell(11).numFmt = currencyFormat
-
-  for (let c = 1; c <= 12; c++) {
-    const cell = grandRow.getCell(c)
-    cell.font = { name: 'Calibri', size: 10, bold: true, color: { argb: 'FF0F172A' } }
-    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFCBD5E1' } }
-    cell.border = {
-      top: { style: 'thin', color: { argb: 'FF94A3B8' } },
-      bottom: { style: 'double', color: { argb: 'FF0F172A' } },
-      left: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-      right: { style: 'thin', color: { argb: 'FFE2E8F0' } },
-    }
-    if (c === 6 || c === 11) {
-      cell.alignment = { horizontal: 'right', vertical: 'middle' }
-    } else {
-      cell.alignment = { horizontal: 'left', vertical: 'middle' }
     }
   }
 

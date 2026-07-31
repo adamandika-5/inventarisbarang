@@ -76,7 +76,7 @@ const TYPE_LABELS: Record<TransactionType, string> = {
 }
 
 /**
- * Builds Excel Workbook for "Riwayat Transaksi" (Single Sheet).
+ * Builds Excel Workbook for "Riwayat Transaksi" (Single Sheet, Quantity-only).
  */
 export async function buildTransactionHistoryWorkbook(
   supabase: SupabaseClient<Database>,
@@ -133,7 +133,6 @@ export async function buildTransactionHistoryWorkbook(
 
   const { data: transactions } = await query
   const txList = transactions || []
-  const txIds = txList.map((t) => t.id)
 
   // Collect original_transaction_ids to resolve reference transaction numbers for reversals
   const origTxIds = Array.from(
@@ -150,49 +149,6 @@ export async function buildTransactionHistoryWorkbook(
     if (origTxData) {
       for (const ot of origTxData) {
         refTxNoMap[ot.id] = ot.transaction_number
-      }
-    }
-  }
-
-  // 3. Fetch historical cost snapshots via RPC get_stock_transaction_costs
-  const costMap: Record<
-    string,
-    {
-      base_unit_cost: number | null
-      transaction_value: number | null
-      has_cost: boolean
-    }
-  > = {}
-
-  if (txIds.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: costsData, error: rpcErr } = await (supabase as any).rpc('get_stock_transaction_costs', {
-      p_transaction_ids: txIds,
-    })
-
-    if (rpcErr) {
-      if (rpcErr.code === 'PGRST202' || rpcErr.message?.includes('Could not find the function')) {
-        throw new Error(
-          'Migration 008_get_stock_transaction_costs_rpc.sql belum diterapkan. Data harga historis belum dapat diverifikasi.',
-        )
-      }
-      throw new Error(`Gagal mengambil data harga historis: ${rpcErr.message}`)
-    }
-
-    if (costsData && Array.isArray(costsData)) {
-      for (const c of costsData) {
-        const costVal =
-          c.base_unit_cost !== null && c.base_unit_cost !== undefined ? parseFloat(String(c.base_unit_cost)) : null
-        const txVal =
-          c.transaction_value !== null && c.transaction_value !== undefined
-            ? parseFloat(String(c.transaction_value))
-            : null
-
-        costMap[c.transaction_id] = {
-          base_unit_cost: costVal,
-          transaction_value: txVal,
-          has_cost: costVal !== null,
-        }
       }
     }
   }
@@ -214,9 +170,9 @@ export async function buildTransactionHistoryWorkbook(
     fitToHeight: 0,
   }
 
-  // 4. Column Widths (ws.columns ONLY sets column widths)
+  // 3. Column Widths (12 columns: A to L)
   worksheet.columns = [
-    { width: 6 }, // A: No.
+    { width: 6 },  // A: No.
     { width: 22 }, // B: Tanggal dan Waktu (WIB)
     { width: 22 }, // C: Nomor Transaksi
     { width: 18 }, // D: Jenis Transaksi
@@ -226,10 +182,8 @@ export async function buildTransactionHistoryWorkbook(
     { width: 16 }, // H: Jumlah Mutasi
     { width: 12 }, // I: Satuan
     { width: 14 }, // J: Stok Setelah
-    { width: 18 }, // K: Harga Satuan
-    { width: 20 }, // L: Nilai Mutasi
-    { width: 20 }, // M: Petugas
-    { width: 35 }, // N: Keterangan
+    { width: 20 }, // K: Petugas
+    { width: 35 }, // L: Keterangan
   ]
 
   const thinBorder = {
@@ -239,26 +193,24 @@ export async function buildTransactionHistoryWorkbook(
     right: { style: 'thin' as const, color: { argb: 'FFE2E8F0' } },
   }
 
-  const currencyFormat = '"Rp"#,##0;("-Rp"#,##0);"Rp"0'
-  const currencyNegativeFormat = '"Rp"#,##0;("-Rp"#,##0);"Rp"0'
   const qtyFormat = '#,##0;(#,##0);0'
 
-  // Header Block (Rows 1-3 merged)
-  worksheet.mergeCells('A1:N1')
+  // Header Block (Rows 1-3 merged A1:L3)
+  worksheet.mergeCells('A1:L1')
   const r1 = worksheet.getRow(1)
   r1.height = 24
   r1.getCell(1).value = instNameDisplay
   r1.getCell(1).font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF0F172A' } }
   r1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
 
-  worksheet.mergeCells('A2:N2')
+  worksheet.mergeCells('A2:L2')
   const r2 = worksheet.getRow(2)
   r2.height = 20
   r2.getCell(1).value = headerTextDisplay
   r2.getCell(1).font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF334155' } }
   r2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
 
-  worksheet.mergeCells('A3:N3')
+  worksheet.mergeCells('A3:L3')
   const r3 = worksheet.getRow(3)
   r3.height = 18
   r3.getCell(1).value = `Periode: ${dateRangeDisplay}   |   Jenis: ${typeFilterLabel}   |   Diunduh: ${generatedAtWib}`
@@ -269,7 +221,7 @@ export async function buildTransactionHistoryWorkbook(
   const r4 = worksheet.getRow(4)
   r4.height = 8
 
-  // Column Headers Row 5 (UNMERGED, All A5:N5 filled with text)
+  // Column Headers Row 5 (A5:L5)
   const headerRow = worksheet.getRow(5)
   headerRow.height = 28
   const headers = [
@@ -283,8 +235,6 @@ export async function buildTransactionHistoryWorkbook(
     'Jumlah Mutasi',
     'Satuan',
     'Stok Setelah',
-    'Harga Satuan',
-    'Nilai Mutasi',
     'Petugas',
     'Keterangan',
   ]
@@ -298,8 +248,8 @@ export async function buildTransactionHistoryWorkbook(
     cell.border = thinBorder
   })
 
-  // Set AutoFilter on A5:N5
-  worksheet.autoFilter = 'A5:N5'
+  // Set AutoFilter on A5:L5
+  worksheet.autoFilter = 'A5:L5'
 
   // Populate Data Rows (Starting Row 6)
   let rowIdx = 6
@@ -323,7 +273,7 @@ export async function buildTransactionHistoryWorkbook(
     const unitSymbolDisplay = unitObj?.symbol || 'pcs'
     const profileDisplay = profileObj?.full_name || profileObj?.username || 'Sistem'
 
-    // Determine Qty Mutasi (positive for IN/INITIAL/ADJUSTMENT_IN, negative for OUT/ADJUSTMENT_OUT)
+    // Determine Qty Mutasi
     const baseQty = Number(t.base_quantity ?? 0)
     let qtyMutasi = 0
     if (t.transaction_type === 'IN' || t.transaction_type === 'INITIAL' || t.transaction_type === 'ADJUSTMENT_IN') {
@@ -337,26 +287,6 @@ export async function buildTransactionHistoryWorkbook(
     }
 
     const stokSetelah = Number(t.stock_after ?? 0)
-
-    // Historical Cost & Mutasi Value
-    const cSnap = costMap[t.id]
-    const hasCost = cSnap ? cSnap.has_cost : false
-    const baseUnitCost = cSnap?.base_unit_cost ?? null
-    const txValue = cSnap?.transaction_value ?? null
-
-    // Determine Nilai Mutasi direction
-    let nilaiMutasi: number | null = null
-    if (hasCost && baseUnitCost !== null) {
-      if (txValue !== null) {
-        if (qtyMutasi < 0) {
-          nilaiMutasi = -Math.abs(txValue)
-        } else {
-          nilaiMutasi = Math.abs(txValue)
-        }
-      } else {
-        nilaiMutasi = baseUnitCost * qtyMutasi
-      }
-    }
 
     // Build Notes / Keterangan with Reversal Reference if present
     let notesDisplay = sanitizeUserString(t.reason)
@@ -378,7 +308,7 @@ export async function buildTransactionHistoryWorkbook(
     row.getCell(6).value = nameDisplay
     row.getCell(7).value = categoryDisplay
 
-    // Col 8: Jumlah Mutasi (Number)
+    // Col 8: Jumlah Mutasi
     const c8 = row.getCell(8)
     c8.value = qtyMutasi
     c8.numFmt = qtyFormat
@@ -386,39 +316,19 @@ export async function buildTransactionHistoryWorkbook(
     // Col 9: Satuan
     row.getCell(9).value = unitSymbolDisplay
 
-    // Col 10: Stok Setelah (Number)
+    // Col 10: Stok Setelah
     const c10 = row.getCell(10)
     c10.value = stokSetelah
     c10.numFmt = '#,##0'
 
-    // Col 11: Harga Satuan (Number or "—")
-    const c11 = row.getCell(11)
-    if (hasCost && baseUnitCost !== null) {
-      c11.value = baseUnitCost
-      c11.numFmt = currencyFormat
-    } else {
-      c11.value = '—'
-      c11.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF94A3B8' } }
-    }
+    // Col 11: Petugas
+    row.getCell(11).value = profileDisplay
 
-    // Col 12: Nilai Mutasi (Number or "—")
-    const c12 = row.getCell(12)
-    if (hasCost && nilaiMutasi !== null) {
-      c12.value = nilaiMutasi
-      c12.numFmt = currencyNegativeFormat
-    } else {
-      c12.value = '—'
-      c12.font = { name: 'Calibri', size: 9.5, italic: true, color: { argb: 'FF94A3B8' } }
-    }
-
-    // Col 13: Petugas
-    row.getCell(13).value = profileDisplay
-
-    // Col 14: Keterangan
-    row.getCell(14).value = notesDisplay
+    // Col 12: Keterangan
+    row.getCell(12).value = notesDisplay
 
     // Alignments and borders for data row
-    for (let c = 1; c <= 14; c++) {
+    for (let c = 1; c <= 12; c++) {
       const cell = row.getCell(c)
       cell.border = thinBorder
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }
@@ -428,7 +338,7 @@ export async function buildTransactionHistoryWorkbook(
 
       if ([1, 2, 3, 4, 5, 9].includes(c)) {
         cell.alignment = { horizontal: 'center', vertical: 'middle' }
-      } else if ([8, 10, 11, 12].includes(c)) {
+      } else if ([8, 10].includes(c)) {
         cell.alignment = { horizontal: 'right', vertical: 'middle' }
       } else {
         cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true }

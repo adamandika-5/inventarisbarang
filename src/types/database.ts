@@ -495,7 +495,7 @@ export type Database = {
           p_item_id: string
           p_unit_id: string
           p_input_quantity: number
-          p_unit_price: string // NUMERIC parameter passed as string or number
+          p_unit_price?: string | null // NUMERIC parameter, optional since migration 011
         }
         Returns: {
           transaction_id: string
@@ -510,7 +510,7 @@ export type Database = {
           p_item_id: string
           p_unit_id: string
           p_input_quantity: number
-          p_unit_price: string
+          p_unit_price?: string | null
         }
         Returns: {
           transaction_id: string

@@ -9,15 +9,17 @@ import {
   getActivityPeriodLabel,
   getJakartaActivityRange,
   getJakartaDashboardRange,
+  getJakartaOutgoingRanges,
   JAKARTA_TIME_ZONE,
   normalizeDashboardActivityPeriod,
   normalizeDashboardStockFilter,
   sanitizeDashboardSearch,
-  summarizeInventoryValue,
+  summarizeOutgoingStock,
   summarizeTotalStock,
 } from '@/lib/dashboard/admin-dashboard'
-import { formatDateTime, formatNumber, formatRupiah } from '@/lib/utils/format'
+import { formatDateTime, formatNumber } from '@/lib/utils/format'
 import type { StockStatus, TransactionType } from '@/types/database'
+import OutgoingStockCard from './components/outgoing-stock-card'
 
 export const metadata: Metadata = {
   title: 'Dashboard Admin — Inventaris Barang',
@@ -195,6 +197,7 @@ export default async function AdminDashboardPage({
   const { monthStartIso, nowIso } = getJakartaDashboardRange(now)
   const { startIso: activityStartIso } = getJakartaActivityRange(activityPeriod, now)
   const periodLabel = getActivityPeriodLabel(activityPeriod)
+  const outgoingRanges = getJakartaOutgoingRanges(now)
 
   let dashboardItemsQuery = supabase
     .from('employee_items_view')
@@ -225,7 +228,8 @@ export default async function AdminDashboardPage({
     activityTransactionsResult,
     recentTransactionsResult,
     dashboardItemsResult,
-    itemCostsResult,
+    monthOutgoingResult,
+    yearOutgoingResult,
   ] = await Promise.all([
     supabase.from('employee_items_view').select('id', { count: 'exact', head: true }),
     supabase
@@ -261,7 +265,24 @@ export default async function AdminDashboardPage({
       .order('transaction_at', { ascending: false })
       .limit(6),
     dashboardItemsQuery,
-    supabase.rpc('get_item_costs', { p_item_ids: null }),
+    // Fetch OUT stock transactions for current WIB month
+    supabase
+      .from('stock_transactions')
+      .select('base_quantity')
+      .eq('transaction_type', 'OUT')
+      .eq('is_reversed', false)
+      .gte('transaction_at', outgoingRanges.monthStartIso)
+      .lt('transaction_at', outgoingRanges.nextMonthStartIso)
+      .limit(10000),
+    // Fetch OUT stock transactions for current WIB year
+    supabase
+      .from('stock_transactions')
+      .select('base_quantity')
+      .eq('transaction_type', 'OUT')
+      .eq('is_reversed', false)
+      .gte('transaction_at', outgoingRanges.yearStartIso)
+      .lt('transaction_at', outgoingRanges.nextYearStartIso)
+      .limit(10000),
   ])
 
   if (process.env.NODE_ENV === 'development') {
@@ -275,18 +296,19 @@ export default async function AdminDashboardPage({
     !!monthTransactionsResult.error ||
     !!activityTransactionsResult.error ||
     !!recentTransactionsResult.error
-  const inventoryValueError = !!itemCostsResult.error
   const tableDataError = !!dashboardItemsResult.error
   const totalStockError = !!totalStockResult.error
+  const outgoingDataError = !!monthOutgoingResult.error || !!yearOutgoingResult.error
   const hasPartialError =
-    stockDataError || transactionDataError || inventoryValueError || tableDataError
+    stockDataError || transactionDataError || tableDataError || outgoingDataError
 
   const totalItems = totalItemsResult.count ?? 0
   const lowStockCount = lowStockResult.count ?? 0
   const outOfStockCount = outOfStockResult.count ?? 0
   const safeStockCount = Math.max(0, totalItems - lowStockCount - outOfStockCount)
   const totalStockUnits = summarizeTotalStock(totalStockResult.data ?? [])
-  const inventoryValue = summarizeInventoryValue(itemCostsResult.data ?? [])
+  const monthOutgoingTotal = summarizeOutgoingStock(monthOutgoingResult.data ?? [])
+  const yearOutgoingTotal = summarizeOutgoingStock(yearOutgoingResult.data ?? [])
 
   // Build chart series based on period
   const activityRows = activityTransactionsResult.data ?? []
@@ -383,7 +405,7 @@ export default async function AdminDashboardPage({
         </div>
       )}
 
-      {/* 4-column metric cards — Hampir Habis & Stok Habis moved to Kondisi Stok panel */}
+      {/* 4-column metric cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Barang Aktif"
@@ -414,26 +436,10 @@ export default async function AdminDashboardPage({
             </svg>
           }
         />
-        <MetricCard
-          label="Nilai Persediaan"
-          value={inventoryValueError ? '—' : formatRupiah(inventoryValue.total)}
-          description={
-            inventoryValueError
-              ? 'Data nilai belum tersedia'
-              : inventoryValue.invalidRows > 0
-                ? `${inventoryValue.invalidRows} data biaya tidak valid dilewati`
-                : 'Total nilai stok saat ini'
-          }
-          tone="green"
-          compact
-          icon={
-            <span
-              className="text-base font-bold"
-              aria-label="Rupiah"
-            >
-              Rp
-            </span>
-          }
+        <OutgoingStockCard
+          monthTotal={monthOutgoingTotal}
+          yearTotal={yearOutgoingTotal}
+          hasError={outgoingDataError}
         />
         <MetricCard
           label="Transaksi Bulan Ini"

@@ -1,8 +1,9 @@
 /**
  * Stock-In Server Actions
- * Records purchase/incoming stock transactions.
+ * Records incoming stock transactions (quantity-only).
  *
  * SECURITY: Admin only, all calculations done server-side.
+ * PRICE: Not recorded. System is quantity-only since migration 011.
  */
 'use server'
 
@@ -17,14 +18,6 @@ const stockInSchema = z.object({
   input_quantity: z
     .string()
     .regex(/^[1-9]\d*$/, 'Jumlah harus bilangan bulat positif.')
-    .transform((v) => parseInt(v, 10)),
-  transaction_unit_price: z
-    .string()
-    .regex(/^\d+$/, 'Harga harus berupa bilangan bulat.')
-    .refine((v) => {
-      const num = parseInt(v, 10)
-      return !isNaN(num) && num >= 0 && num <= 1000000000000
-    }, 'Harga tidak valid atau melebihi batas.')
     .transform((v) => parseInt(v, 10)),
 })
 
@@ -47,8 +40,9 @@ async function verifyAdmin() {
 }
 
 /**
- * Process a stock-in transaction.
- * Calls the process_stock_in RPC which handles atomicity and moving average.
+ * Process a stock-in transaction (quantity-only).
+ * Calls the process_stock_in RPC which handles atomicity.
+ * Price is not sent — system is quantity-only since migration 011.
  */
 export async function processStockIn(formData: FormData): Promise<ActionResult> {
   try {
@@ -60,7 +54,6 @@ export async function processStockIn(formData: FormData): Promise<ActionResult> 
       item_id: formData.get('item_id') as string,
       unit_id: formData.get('unit_id') as string,
       input_quantity: formData.get('input_quantity') as string,
-      transaction_unit_price: formData.get('transaction_unit_price') as string,
     }
 
     const parsed = stockInSchema.safeParse(rawData)
@@ -68,18 +61,17 @@ export async function processStockIn(formData: FormData): Promise<ActionResult> 
       return { success: false, error: parsed.error.issues.map(i => i.message).join(' ') }
     }
 
+    // p_unit_price is not sent — PostgreSQL uses DEFAULT NULL (migration 011)
     const { data, error } = await supabase.rpc('process_stock_in', {
       p_client_request_id: parsed.data.client_request_id,
       p_item_id: parsed.data.item_id,
       p_input_quantity: parsed.data.input_quantity,
       p_unit_id: parsed.data.unit_id,
-      p_unit_price: String(parsed.data.transaction_unit_price),
     })
 
     if (error) {
       console.error(`process_stock_in failed - code: ${error.code}, message: ${error.message}`)
-      
-      // Translate known RPC errors
+
       if (error.message.includes('already processed')) {
         return { success: false, error: 'Transaksi ini sudah pernah diproses (duplikat).' }
       }

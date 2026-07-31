@@ -21,11 +21,13 @@ import {
   sanitizeDashboardSearch,
   getJakartaDashboardRange,
   getJakartaActivityRange,
+  getJakartaOutgoingRanges,
   buildDailyTransactionSeries,
   buildWeeklyTransactionSeries,
   buildMonthlyTransactionSeries,
   summarizeInventoryValue,
   summarizeTotalStock,
+  summarizeOutgoingStock,
   JAKARTA_TIME_ZONE,
 } from '@/lib/dashboard/admin-dashboard'
 
@@ -615,3 +617,60 @@ describe('summarizeTotalStock', () => {
     ])).toBe(300)
   })
 })
+
+// ── getJakartaOutgoingRanges ───────────────────────────────────────────────────
+
+describe('getJakartaOutgoingRanges', () => {
+  it('computes half-open WIB date bounds for current month and year', () => {
+    // Reference date: 2026-07-30T13:30:00.000Z (2026-07-30 20:30:00 WIB)
+    const refDate = new Date('2026-07-30T13:30:00.000Z')
+    const ranges = getJakartaOutgoingRanges(refDate)
+
+    expect(ranges.monthStartIso).toContain('2026-07-01T00:00:00+07:00')
+    expect(ranges.nextMonthStartIso).toContain('2026-08-01T00:00:00+07:00')
+
+    expect(ranges.yearStartIso).toContain('2026-01-01T00:00:00+07:00')
+    expect(ranges.nextYearStartIso).toContain('2027-01-01T00:00:00+07:00')
+  })
+})
+
+// ── summarizeOutgoingStock ─────────────────────────────────────────────────────
+
+describe('summarizeOutgoingStock', () => {
+  it('returns 0 for empty array', () => {
+    expect(summarizeOutgoingStock([])).toBe(0)
+  })
+
+  it('sums numeric base_quantity values of OUT transactions', () => {
+    expect(summarizeOutgoingStock([
+      { base_quantity: 10 },
+      { base_quantity: 25 },
+      { base_quantity: 5 },
+    ])).toBe(40)
+  })
+
+  it('sums string-numeric base_quantity values', () => {
+    expect(summarizeOutgoingStock([
+      { base_quantity: '15' },
+      { base_quantity: '20' },
+    ])).toBe(35)
+  })
+
+  it('ignores null, undefined, and non-numeric base_quantity rows', () => {
+    expect(summarizeOutgoingStock([
+      { base_quantity: null },
+      { base_quantity: undefined },
+      { base_quantity: 'invalid' },
+      { base_quantity: 50 },
+    ])).toBe(50)
+  })
+
+  it('ignores zero or negative base_quantity values', () => {
+    expect(summarizeOutgoingStock([
+      { base_quantity: 0 },
+      { base_quantity: -10 },
+      { base_quantity: 30 },
+    ])).toBe(30)
+  })
+})
+

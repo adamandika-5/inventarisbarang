@@ -1,4 +1,4 @@
-﻿import type { Metadata } from 'next'
+import type { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import AuditLogClient from './audit-log-client'
 
@@ -13,9 +13,10 @@ export default async function AuditLogPage({
 }) {
   const supabase = await createSupabaseServerClient()
   const params = await searchParams
-  const page = Math.max(1, parseInt(params.page ?? '1', 10))
+  const rawPage = parseInt(params.page ?? '1', 10)
+  const page = Math.max(1, isNaN(rawPage) ? 1 : rawPage)
   const actionFilter = params.action ?? ''
-  const pageSize = 30
+  const pageSize = 20
 
   let query = supabase
     .from('audit_logs')
