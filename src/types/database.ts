@@ -576,6 +576,22 @@ export type Database = {
           updated_at: string
         }>
       }
+      // Aggregate all Admin Dashboard card metrics in a single PostgreSQL call
+      get_dashboard_stats: {
+        Args: {
+          p_tz?: string
+          p_now?: string | null
+        }
+        Returns: {
+          active_items_count: number
+          total_stock_units: number
+          low_stock_count: number
+          out_of_stock_count: number
+          outgoing_month_qty: number
+          outgoing_year_qty: number
+          month_transactions_count: number
+        }
+      }
     }
     Enums: {
       user_role: UserRole

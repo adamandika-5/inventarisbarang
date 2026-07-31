@@ -28,6 +28,7 @@ import {
   summarizeInventoryValue,
   summarizeTotalStock,
   summarizeOutgoingStock,
+  parseDashboardStats,
   JAKARTA_TIME_ZONE,
 } from '@/lib/dashboard/admin-dashboard'
 
@@ -674,3 +675,92 @@ describe('summarizeOutgoingStock', () => {
   })
 })
 
+// ── parseDashboardStats ────────────────────────────────────────────────────────
+
+describe('parseDashboardStats', () => {
+  it('returns all zero fields for null input (RPC error fallback)', () => {
+    const result = parseDashboardStats(null)
+    expect(result.active_items_count).toBe(0)
+    expect(result.total_stock_units).toBe(0)
+    expect(result.low_stock_count).toBe(0)
+    expect(result.out_of_stock_count).toBe(0)
+    expect(result.outgoing_month_qty).toBe(0)
+    expect(result.outgoing_year_qty).toBe(0)
+    expect(result.month_transactions_count).toBe(0)
+  })
+
+  it('returns all zero fields for empty object', () => {
+    const result = parseDashboardStats({})
+    expect(result.active_items_count).toBe(0)
+    expect(result.total_stock_units).toBe(0)
+    expect(result.low_stock_count).toBe(0)
+    expect(result.out_of_stock_count).toBe(0)
+    expect(result.outgoing_month_qty).toBe(0)
+    expect(result.outgoing_year_qty).toBe(0)
+    expect(result.month_transactions_count).toBe(0)
+  })
+
+  it('parses numeric values correctly', () => {
+    const result = parseDashboardStats({
+      active_items_count: 42,
+      total_stock_units: 1234,
+      low_stock_count: 5,
+      out_of_stock_count: 2,
+      outgoing_month_qty: 300,
+      outgoing_year_qty: 1500,
+      month_transactions_count: 87,
+    })
+    expect(result.active_items_count).toBe(42)
+    expect(result.total_stock_units).toBe(1234)
+    expect(result.low_stock_count).toBe(5)
+    expect(result.out_of_stock_count).toBe(2)
+    expect(result.outgoing_month_qty).toBe(300)
+    expect(result.outgoing_year_qty).toBe(1500)
+    expect(result.month_transactions_count).toBe(87)
+  })
+
+  it('parses numeric string values (PostgreSQL NUMERIC comes as string)', () => {
+    const result = parseDashboardStats({
+      active_items_count: '10',
+      total_stock_units: '500',
+      low_stock_count: '3',
+      out_of_stock_count: '1',
+      outgoing_month_qty: '75.0',
+      outgoing_year_qty: '900.5',
+      month_transactions_count: '33',
+    })
+    expect(result.active_items_count).toBe(10)
+    expect(result.total_stock_units).toBe(500)
+    expect(result.low_stock_count).toBe(3)
+    expect(result.out_of_stock_count).toBe(1)
+    expect(result.outgoing_month_qty).toBe(75)
+    expect(result.outgoing_year_qty).toBe(900.5)
+    expect(result.month_transactions_count).toBe(33)
+  })
+
+  it('treats NaN, negative numbers, and non-numeric strings as 0', () => {
+    const result = parseDashboardStats({
+      active_items_count: 'invalid',
+      total_stock_units: -5,
+      low_stock_count: NaN,
+      out_of_stock_count: null,
+      outgoing_month_qty: undefined,
+      outgoing_year_qty: {},
+      month_transactions_count: [],
+    })
+    expect(result.active_items_count).toBe(0)
+    expect(result.total_stock_units).toBe(0)
+    expect(result.low_stock_count).toBe(0)
+    expect(result.out_of_stock_count).toBe(0)
+    expect(result.outgoing_month_qty).toBe(0)
+    expect(result.outgoing_year_qty).toBe(0)
+    expect(result.month_transactions_count).toBe(0)
+  })
+
+  it('treats an array as an empty object and returns zeros', () => {
+    // Supabase can return arrays for table-returning RPCs; JSON-returning RPCs return an object
+    const result = parseDashboardStats([1, 2, 3])
+    expect(result.active_items_count).toBe(0)
+    expect(result.total_stock_units).toBe(0)
+  })
+})

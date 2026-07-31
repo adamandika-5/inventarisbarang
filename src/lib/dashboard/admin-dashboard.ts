@@ -96,6 +96,52 @@ export interface ActivityRange {
   endIso: string
 }
 
+// ── DashboardStats ─────────────────────────────────────────────────────────────
+
+/**
+ * Shape of the JSON object returned by the `get_dashboard_stats` PostgreSQL RPC.
+ * The RPC returns a single JSON object (not a table), so Supabase wraps it in
+ * an array when called via `.rpc()`. Consumers should use `parseDashboardStats`.
+ */
+export interface DashboardStats {
+  active_items_count: number
+  total_stock_units: number
+  low_stock_count: number
+  out_of_stock_count: number
+  outgoing_month_qty: number
+  outgoing_year_qty: number
+  month_transactions_count: number
+}
+
+/**
+ * Parse the `get_dashboard_stats` RPC result into a typed `DashboardStats`.
+ *
+ * The Supabase JS client returns RPC results as `data`. When the function
+ * returns JSON, `data` is already parsed to the JSON value.
+ * All fields are cast to number via `Number()` and validated as finite,
+ * falling back to 0 for safety against unexpected DB data types.
+ */
+export function parseDashboardStats(data: unknown): DashboardStats {
+  const obj = (data !== null && typeof data === 'object' && !Array.isArray(data))
+    ? data as Record<string, unknown>
+    : {}
+
+  const toSafeNumber = (v: unknown): number => {
+    const n = Number(v)
+    return Number.isFinite(n) && n >= 0 ? n : 0
+  }
+
+  return {
+    active_items_count:       toSafeNumber(obj.active_items_count),
+    total_stock_units:        toSafeNumber(obj.total_stock_units),
+    low_stock_count:          toSafeNumber(obj.low_stock_count),
+    out_of_stock_count:       toSafeNumber(obj.out_of_stock_count),
+    outgoing_month_qty:       toSafeNumber(obj.outgoing_month_qty),
+    outgoing_year_qty:        toSafeNumber(obj.outgoing_year_qty),
+    month_transactions_count: toSafeNumber(obj.month_transactions_count),
+  }
+}
+
 // ── normalizeDashboardStockFilter ──────────────────────────────────────────────
 
 /**

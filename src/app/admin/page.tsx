@@ -8,14 +8,11 @@ import {
   buildWeeklyTransactionSeries,
   getActivityPeriodLabel,
   getJakartaActivityRange,
-  getJakartaDashboardRange,
-  getJakartaOutgoingRanges,
   JAKARTA_TIME_ZONE,
   normalizeDashboardActivityPeriod,
   normalizeDashboardStockFilter,
+  parseDashboardStats,
   sanitizeDashboardSearch,
-  summarizeOutgoingStock,
-  summarizeTotalStock,
 } from '@/lib/dashboard/admin-dashboard'
 import { formatDateTime, formatNumber } from '@/lib/utils/format'
 import type { StockStatus, TransactionType } from '@/types/database'
@@ -194,10 +191,8 @@ export default async function AdminDashboardPage({
   const search = sanitizeDashboardSearch(params.q)
   const stockFilter = normalizeDashboardStockFilter(params.stock)
   const activityPeriod = normalizeDashboardActivityPeriod(params.activityPeriod)
-  const { monthStartIso, nowIso } = getJakartaDashboardRange(now)
-  const { startIso: activityStartIso } = getJakartaActivityRange(activityPeriod, now)
+  const { startIso: activityStartIso, endIso: activityEndIso } = getJakartaActivityRange(activityPeriod, now)
   const periodLabel = getActivityPeriodLabel(activityPeriod)
-  const outgoingRanges = getJakartaOutgoingRanges(now)
 
   let dashboardItemsQuery = supabase
     .from('employee_items_view')
@@ -220,43 +215,22 @@ export default async function AdminDashboardPage({
 
   const dashboardStart = performance.now()
   const [
-    totalItemsResult,
-    lowStockResult,
-    outOfStockResult,
-    totalStockResult,
-    monthTransactionsResult,
+    dashboardStatsResult,
     activityTransactionsResult,
     recentTransactionsResult,
     dashboardItemsResult,
-    monthOutgoingResult,
-    yearOutgoingResult,
   ] = await Promise.all([
-    supabase.from('employee_items_view').select('id', { count: 'exact', head: true }),
-    supabase
-      .from('employee_items_view')
-      .select('id', { count: 'exact', head: true })
-      .eq('stock_status', 'HAMPIR_HABIS'),
-    supabase
-      .from('employee_items_view')
-      .select('id', { count: 'exact', head: true })
-      .eq('stock_status', 'HABIS'),
-    // Fetch current_stock for all active items to sum total units
-    supabase
-      .from('employee_items_view')
-      .select('current_stock')
-      .limit(10000),
-    supabase
-      .from('stock_transactions')
-      .select('id', { count: 'exact', head: true })
-      .gte('transaction_at', monthStartIso)
-      .lte('transaction_at', nowIso),
+    // Single RPC aggregation — replaces 7 separate card queries
+    supabase.rpc('get_dashboard_stats', { p_tz: JAKARTA_TIME_ZONE }),
+    // Activity chart data (needed for chart rendering, bounded by period)
     supabase
       .from('stock_transactions')
       .select('transaction_at,quantity_delta')
       .gte('transaction_at', activityStartIso)
-      .lte('transaction_at', nowIso)
+      .lte('transaction_at', activityEndIso)
       .order('transaction_at', { ascending: true })
-      .limit(10000),
+      .limit(500),
+    // Recent transactions table (6 rows only)
     supabase
       .from('stock_transactions')
       .select(
@@ -265,24 +239,6 @@ export default async function AdminDashboardPage({
       .order('transaction_at', { ascending: false })
       .limit(6),
     dashboardItemsQuery,
-    // Fetch OUT stock transactions for current WIB month
-    supabase
-      .from('stock_transactions')
-      .select('base_quantity')
-      .eq('transaction_type', 'OUT')
-      .eq('is_reversed', false)
-      .gte('transaction_at', outgoingRanges.monthStartIso)
-      .lt('transaction_at', outgoingRanges.nextMonthStartIso)
-      .limit(10000),
-    // Fetch OUT stock transactions for current WIB year
-    supabase
-      .from('stock_transactions')
-      .select('base_quantity')
-      .eq('transaction_type', 'OUT')
-      .eq('is_reversed', false)
-      .gte('transaction_at', outgoingRanges.yearStartIso)
-      .lt('transaction_at', outgoingRanges.nextYearStartIso)
-      .limit(10000),
   ])
 
   if (process.env.NODE_ENV === 'development') {
@@ -290,25 +246,28 @@ export default async function AdminDashboardPage({
     console.log(`[PERF] AdminDashboardPage parallel data queries: ${(performance.now() - dashboardStart).toFixed(2)}ms`)
   }
 
-  const stockDataError =
-    !!totalItemsResult.error || !!lowStockResult.error || !!outOfStockResult.error
+  // ── Error detection ──
+  const statsError       = !!dashboardStatsResult.error
   const transactionDataError =
-    !!monthTransactionsResult.error ||
     !!activityTransactionsResult.error ||
     !!recentTransactionsResult.error
-  const tableDataError = !!dashboardItemsResult.error
-  const totalStockError = !!totalStockResult.error
-  const outgoingDataError = !!monthOutgoingResult.error || !!yearOutgoingResult.error
-  const hasPartialError =
-    stockDataError || transactionDataError || tableDataError || outgoingDataError
+  const tableDataError   = !!dashboardItemsResult.error
+  const hasPartialError  = statsError || transactionDataError || tableDataError
 
-  const totalItems = totalItemsResult.count ?? 0
-  const lowStockCount = lowStockResult.count ?? 0
-  const outOfStockCount = outOfStockResult.count ?? 0
-  const safeStockCount = Math.max(0, totalItems - lowStockCount - outOfStockCount)
-  const totalStockUnits = summarizeTotalStock(totalStockResult.data ?? [])
-  const monthOutgoingTotal = summarizeOutgoingStock(monthOutgoingResult.data ?? [])
-  const yearOutgoingTotal = summarizeOutgoingStock(yearOutgoingResult.data ?? [])
+  // ── Parse aggregated stats from RPC ──
+  // We distinguish RPC error from genuine zero-result: statsError=true → show '—'
+  const stats = parseDashboardStats(dashboardStatsResult.data)
+
+  const totalItems        = statsError ? 0 : stats.active_items_count
+  const totalStockUnits   = statsError ? 0 : stats.total_stock_units
+  const monthOutgoingTotal = statsError ? 0 : stats.outgoing_month_qty
+  const yearOutgoingTotal  = statsError ? 0 : stats.outgoing_year_qty
+  const monthTransactions  = statsError ? 0 : stats.month_transactions_count
+
+  // These are now provided by the RPC — no longer computed client-side
+  const lowStockCount   = statsError ? 0 : stats.low_stock_count
+  const outOfStockCount = statsError ? 0 : stats.out_of_stock_count
+  const safeStockCount  = statsError ? 0 : Math.max(0, totalItems - lowStockCount - outOfStockCount)
 
   // Build chart series based on period
   const activityRows = activityTransactionsResult.data ?? []
@@ -409,14 +368,14 @@ export default async function AdminDashboardPage({
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <MetricCard
           label="Barang Aktif"
-          value={stockDataError ? '—' : formatNumber(totalItems)}
+          value={statsError ? '—' : formatNumber(totalItems)}
           description="Seluruh SKU barang yang dapat ditransaksikan"
           tone="blue"
           icon={boxIcon}
         />
         <MetricCard
           label="Total Unit Stok"
-          value={totalStockError ? '—' : formatNumber(totalStockUnits)}
+          value={statsError ? '—' : formatNumber(totalStockUnits)}
           description="Jumlah unit stok seluruh barang aktif"
           tone="slate"
           icon={
@@ -439,12 +398,12 @@ export default async function AdminDashboardPage({
         <OutgoingStockCard
           monthTotal={monthOutgoingTotal}
           yearTotal={yearOutgoingTotal}
-          hasError={outgoingDataError}
+          hasError={statsError}
         />
         <MetricCard
           label="Transaksi Bulan Ini"
           value={
-            monthTransactionsResult.error ? '—' : formatNumber(monthTransactionsResult.count ?? 0)
+            statsError ? '—' : formatNumber(monthTransactions)
           }
           description={monthLabel}
           tone="slate"
@@ -703,7 +662,7 @@ export default async function AdminDashboardPage({
               </p>
             </div>
 
-            {stockDataError ? (
+            {statsError ? (
               <p className="mt-5 text-sm text-slate-500 dark:text-slate-400">
                 Ringkasan kondisi stok belum dapat dimuat.
               </p>
