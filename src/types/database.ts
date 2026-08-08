@@ -592,6 +592,24 @@ export type Database = {
           month_transactions_count: number
         }
       }
+      // Aggregate Admin Reports summary stats in a single PostgreSQL call
+      get_report_summary: {
+        Args: {
+          p_from_at: string
+          p_to_at: string
+          p_type?: string | null
+          p_item_id?: string | null
+        }
+        Returns: {
+          total_in: number
+          total_out: number
+          total_adjustment_in: number
+          total_adjustment_out: number
+          total_reversal: number
+          total_transactions: number
+          low_stock_count: number
+        }
+      }
     }
     Enums: {
       user_role: UserRole

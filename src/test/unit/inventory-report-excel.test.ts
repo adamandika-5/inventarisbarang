@@ -2,28 +2,43 @@ import { describe, it, expect } from 'vitest'
 import ExcelJS from 'exceljs'
 import {
   buildInventoryReportWorkbook,
-  type InventoryReportData,
   sanitizeUserString,
+  parseIsoToNano,
+  type InventoryReportData,
 } from '@/lib/reports/inventory-summary-excel'
 import { buildTransactionHistoryWorkbook } from '@/lib/reports/transaction-history-excel'
 
 describe('Inventory Summary Report Excel Generation & Verification (Quantity-Only)', () => {
-  it('correctly sanitizes formula strings without affecting negative numbers', () => {
-    expect(sanitizeUserString('=1+1')).toBe("'=1+1")
-    expect(sanitizeUserString('+cmd')).toBe("'+cmd")
-    expect(sanitizeUserString('-cmd')).toBe("'-cmd")
-    expect(sanitizeUserString('@eval')).toBe("'@eval")
-    expect(sanitizeUserString('Normal Text')).toBe('Normal Text')
-    expect(sanitizeUserString('')).toBe('')
+  it('correctly sanitizes user input strings to prevent formula injection in Excel', () => {
+    expect(sanitizeUserString('Normal Item Name')).toBe('Normal Item Name')
+    expect(sanitizeUserString('=SUM(A1:A10)')).toBe("'=SUM(A1:A10)")
+    expect(sanitizeUserString('+12345')).toBe("'+12345")
+    expect(sanitizeUserString('-54321')).toBe("'-54321")
+    expect(sanitizeUserString('@EXEC')).toBe("'@EXEC")
+    expect(sanitizeUserString('   =TRIM_TEST  ')).toBe("'=TRIM_TEST")
+    expect(sanitizeUserString(null)).toBe('')
+    expect(sanitizeUserString(undefined)).toBe('')
   })
 
-  it('builds a valid quantity-only "Rincian Persediaan" Excel workbook', async () => {
+  it('correctly parses ISO timestamptz strings to nanosecond precision using parseIsoToNano', () => {
+    const t1 = parseIsoToNano('2026-07-15T12:00:00.000001Z')
+    const t2 = parseIsoToNano('2026-07-15T12:00:00.000002Z')
+
+    expect(t1).not.toBeNull()
+    expect(t2).not.toBeNull()
+    expect(t2! > t1!).toBe(true)
+    expect(t2! - t1!).toBe(1000n) // 1 microsecond = 1000 nanoseconds
+
+    expect(parseIsoToNano('invalid-date')).toBeNull()
+  })
+
+  it('builds a valid quantity-only "Rincian Persediaan" Excel workbook strictly matching HEAD layout and format', async () => {
     const mockReportData: InventoryReportData = {
       institutionName: 'DINAS KESEHATAN KOTA BANDUNG',
       reportHeaderText: 'PEMERINTAH KOTA BANDUNG',
       dateFromWib: '2026-01-01',
       dateToWib: '2026-01-31',
-      generatedAtWib: '31-01-2026 23:59',
+      generatedAtWib: '1 Februari 2026, 03.00 WIB',
       categories: [
         {
           categoryId: 'cat-1',
@@ -85,17 +100,32 @@ describe('Inventory Summary Report Excel Generation & Verification (Quantity-Onl
     const readerWorkbook = new ExcelJS.Workbook()
     await readerWorkbook.xlsx.load(buffer as unknown as ExcelJS.Buffer)
 
-    // 1. Verify Sheet Name
+    // 1. Verify Sheet Name (ONLY 1 sheet: Rincian Persediaan)
+    expect(readerWorkbook.worksheets.map((w) => w.name)).toEqual(['Rincian Persediaan'])
     const worksheet = readerWorkbook.getWorksheet('Rincian Persediaan')
     expect(worksheet).toBeDefined()
     if (!worksheet) return
 
-    // 2. Verify Page Setup & Print Titles
+    // Verify Workbook Title Merges (Explicit assertion for A1:H1, A2:H2, A3:H3, A4:H4)
+    const merges = (worksheet.model as { merges?: string[] }).merges || []
+    expect(merges).toContain('A1:H1')
+    expect(merges).toContain('A2:H2')
+    expect(merges).toContain('A3:H3')
+    expect(merges).toContain('A4:H4')
+
+    // 2. Verify Page Setup & Print Titles & Freeze Pane & Column Widths
     expect(worksheet.pageSetup.orientation).toBe('landscape')
     expect(worksheet.pageSetup.paperSize).toBe(9) // A4
     expect(worksheet.pageSetup.fitToWidth).toBe(1)
+    expect(worksheet.views[0]?.state).toBe('frozen')
+    expect((worksheet.views[0] as ExcelJS.WorksheetViewFrozen)?.ySplit).toBe(5)
 
-    // 3. Verify Header Title & Metadata (Rows 1-4)
+    const expectedWidths = [6, 14, 34, 18, 16, 16, 16, 18]
+    for (let c = 1; c <= 8; c++) {
+      expect(worksheet.getColumn(c).width).toBe(expectedWidths[c - 1])
+    }
+
+    // 3. Verify Merged Header Title Block (Rows 1-4: Merged A1:H1, A2:H2, A3:H3, A4:H4)
     const instCell = worksheet.getCell('A1')
     expect(instCell.value).toBe('DINAS KESEHATAN KOTA BANDUNG')
 
@@ -105,18 +135,39 @@ describe('Inventory Summary Report Excel Generation & Verification (Quantity-Onl
     const dateCell = worksheet.getCell('A3')
     expect(dateCell.value).toBe('Periode: 1 Januari 2026 s/d 31 Januari 2026')
 
+    const genCell = worksheet.getCell('A4')
+    expect(genCell.value).toBe('Dibuat pada: 1 Februari 2026, 03.00 WIB')
+
     // 4. Verify Table Headers (Row 6 - 8 columns total)
-    const headerNoCell = worksheet.getCell('A6')
-    expect(headerNoCell.value).toBe('No.')
+    const headersExpected = [
+      'No.',
+      'Kode Barang (SKU)',
+      'Nama Barang',
+      'Satuan',
+      'Saldo Awal (Qty)',
+      'Mutasi Masuk (Qty)',
+      'Mutasi Keluar (Qty)',
+      'Saldo Akhir (Qty)',
+    ]
 
-    const headerCodeCell = worksheet.getCell('B6')
-    expect(headerCodeCell.value).toBe('Kode Barang (SKU)')
+    for (let c = 1; c <= 8; c++) {
+      const headerCell = worksheet.getRow(6).getCell(c)
+      expect(headerCell.value).toBe(headersExpected[c - 1])
+    }
 
-    const headerSaldoAkhirCell = worksheet.getCell('H6')
-    expect(headerSaldoAkhirCell.value).toBe('Saldo Akhir (Qty)')
+    // Explicit check for required positions
+    expect(worksheet.getCell('B6').value).toBe('Kode Barang (SKU)')
+    expect(worksheet.getCell('H6').value).toBe('Saldo Akhir (Qty)')
 
-    // 5. Verify Item Data & Types
-    // Row 7: Category 1 header
+    // 5. Verify Category Header Row Styling (EXACT HEAD RECOVERY: font white, fill FF334155)
+    const cat1Row = worksheet.getRow(7)
+    const cat1Cell = cat1Row.getCell(1)
+    expect(cat1Cell.value).toBe('KATEGORI: ALAT TULIS KANTOR')
+    expect(cat1Cell.font?.color?.argb).toBe('FFFFFFFF')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    expect((cat1Cell.fill as any)?.fgColor?.argb).toBe('FF334155')
+
+    // 6. Verify Item Data & Types
     // Row 8: Item 1 (00123-ATK)
     const item1SkuCell = worksheet.getCell('B8')
     expect(item1SkuCell.value).toBe('00123-ATK') // String preserved leading zero
@@ -124,20 +175,24 @@ describe('Inventory Summary Report Excel Generation & Verification (Quantity-Onl
     const item1SaldoAwalQtyCell = worksheet.getCell('E8')
     expect(typeof item1SaldoAwalQtyCell.value).toBe('number')
     expect(item1SaldoAwalQtyCell.value).toBe(10)
+    expect(item1SaldoAwalQtyCell.numFmt).toBe('#,##0')
 
     const item1MutasiMasukCell = worksheet.getCell('F8')
     expect(typeof item1MutasiMasukCell.value).toBe('number')
     expect(item1MutasiMasukCell.value).toBe(10)
+    expect(item1MutasiMasukCell.numFmt).toBe('#,##0')
 
     const item1MutasiKeluarCell = worksheet.getCell('G8')
     expect(typeof item1MutasiKeluarCell.value).toBe('number')
     expect(item1MutasiKeluarCell.value).toBe(5)
+    expect(item1MutasiKeluarCell.numFmt).toBe('#,##0')
 
     const item1SaldoAkhirQtyCell = worksheet.getCell('H8')
     expect(typeof item1SaldoAkhirQtyCell.value).toBe('number')
     expect(item1SaldoAkhirQtyCell.value).toBe(15)
+    expect(item1SaldoAkhirQtyCell.numFmt).toBe('#,##0')
 
-    // 6. Ledger Reconciliation for Item 1
+    // 7. Ledger Reconciliation for Item 1
     const saldoAwal = item1SaldoAwalQtyCell.value as number
     const mutasiMasuk = item1MutasiMasukCell.value as number
     const mutasiKeluar = item1MutasiKeluarCell.value as number
@@ -152,6 +207,7 @@ describe('Inventory Summary Report Excel Generation & Verification (Quantity-Onl
       lt: () => mockQueryBuilder,
       eq: () => mockQueryBuilder,
       in: () => mockQueryBuilder,
+      or: () => mockQueryBuilder,
       order: () => mockQueryBuilder,
       limit: () =>
         Promise.resolve({
@@ -205,7 +261,7 @@ describe('Inventory Summary Report Excel Generation & Verification (Quantity-Onl
         dateToStr: '2026-01-31',
         institutionName: 'BPS KOTA MOJOKERTO',
         reportHeaderText: 'LAPORAN RIWAYAT TRANSAKSI STOK',
-      }
+      },
     )
 
     expect(buffer).toBeInstanceOf(Buffer)
@@ -213,14 +269,12 @@ describe('Inventory Summary Report Excel Generation & Verification (Quantity-Onl
     const readerWorkbook = new ExcelJS.Workbook()
     await readerWorkbook.xlsx.load(buffer as unknown as ExcelJS.Buffer)
 
-    // 1. Verify Workbook has ONLY 1 sheet: "Riwayat Transaksi"
     expect(readerWorkbook.worksheets.map((w) => w.name)).toEqual(['Riwayat Transaksi'])
 
     const wsRiwayat = readerWorkbook.getWorksheet('Riwayat Transaksi')
     expect(wsRiwayat).toBeDefined()
     if (!wsRiwayat) return
 
-    // 2. Verify Headers A5:L5 are all filled (12 columns, no price/cost)
     const headersExpected = [
       'No.',
       'Tanggal dan Waktu (WIB)',
@@ -241,14 +295,12 @@ describe('Inventory Summary Report Excel Generation & Verification (Quantity-Onl
       expect(headerCell.value).toBe(headersExpected[c - 1])
     }
 
-    // 3. Row 6: tx-1 (Barang Masuk 10 pcs)
     const qtyMutasiCell1 = wsRiwayat.getCell('H6')
     expect(qtyMutasiCell1.value).toBe(10)
 
     const stokSetelahCell1 = wsRiwayat.getCell('J6')
     expect(stokSetelahCell1.value).toBe(10)
 
-    // 4. Row 7: tx-2 (Barang Keluar 5 pcs)
     const qtyMutasiCell2 = wsRiwayat.getCell('H7')
     expect(qtyMutasiCell2.value).toBe(-5)
 

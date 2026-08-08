@@ -1,9 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { buildTransactionHistoryWorkbook } from '@/lib/reports/transaction-history-excel'
-import { formatInTimeZone } from 'date-fns-tz'
-
-const TZ = 'Asia/Jakarta'
+import { normalizeReportFilters } from '@/lib/reports/report-filters'
 
 /**
  * GET /api/reports/transactions-detail?from=YYYY-MM-DD&to=YYYY-MM-DD&type=...&item=...
@@ -33,25 +31,28 @@ export async function GET(request: NextRequest) {
 
   try {
     const searchParams = request.nextUrl.searchParams
+    const rawFrom = searchParams.get('from')
+    const rawTo = searchParams.get('to')
+    const rawType = searchParams.get('type')
+    const rawItem = searchParams.get('item')
 
-    const nowWib = formatInTimeZone(new Date(), TZ, 'yyyy-MM-dd')
-    const thirtyDaysAgoWib = formatInTimeZone(
-      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-      TZ,
-      'yyyy-MM-dd'
-    )
+    const normalized = normalizeReportFilters({
+      from: rawFrom,
+      to: rawTo,
+      type: rawType,
+      item: rawItem,
+    })
 
-    const rawFrom = searchParams.get('from') || thirtyDaysAgoWib
-    const rawTo = searchParams.get('to') || nowWib
-    const typeFilter = searchParams.get('type') || undefined
-    const itemFilter = searchParams.get('item') || undefined
-
-    const safeFrom = /^\d{4}-\d{2}-\d{2}$/.test(rawFrom) ? rawFrom : thirtyDaysAgoWib
-    const safeTo = /^\d{4}-\d{2}-\d{2}$/.test(rawTo) ? rawTo : nowWib
+    if (normalized.isInvalidDateRange) {
+      return NextResponse.json(
+        { error: 'Tanggal awal tidak boleh lebih besar dari tanggal akhir.' },
+        { status: 400 },
+      )
+    }
 
     // Format dates for filename: DD-MM-YYYY
-    const fromParts = safeFrom.split('-')
-    const toParts = safeTo.split('-')
+    const fromParts = normalized.safeFrom.split('-')
+    const toParts = normalized.safeTo.split('-')
     const formattedFrom = `${fromParts[2]}-${fromParts[1]}-${fromParts[0]}`
     const formattedTo = `${toParts[2]}-${toParts[1]}-${toParts[0]}`
 
@@ -65,10 +66,10 @@ export async function GET(request: NextRequest) {
       .maybeSingle()
 
     const excelBuffer = await buildTransactionHistoryWorkbook(supabase, {
-      dateFromStr: safeFrom,
-      dateToStr: safeTo,
-      typeFilter,
-      itemFilter,
+      dateFromStr: normalized.safeFrom,
+      dateToStr: normalized.safeTo,
+      typeFilter: normalized.typeFilter,
+      itemFilter: normalized.itemFilter,
       institutionName: settings?.institution_name ?? null,
       reportHeaderText: settings?.report_header_text ?? null,
     })

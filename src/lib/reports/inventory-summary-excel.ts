@@ -1,6 +1,11 @@
 import ExcelJS from 'exceljs'
+import { formatInTimeZone } from 'date-fns-tz'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/types/database'
+import { normalizeReportFilters } from './report-filters'
+
+const TZ = 'Asia/Jakarta'
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const INDO_MONTHS = [
   'Januari',
@@ -33,12 +38,29 @@ function formatIndonesianDateStr(dateStr?: string | null): string {
 }
 
 function formatIndonesianDateTime(d: Date): string {
-  const day = d.getDate()
-  const monthName = INDO_MONTHS[d.getMonth()]
-  const year = d.getFullYear()
-  const hours = String(d.getHours()).padStart(2, '0')
-  const mins = String(d.getMinutes()).padStart(2, '0')
-  return `${day} ${monthName} ${year}, ${hours}.${mins} WIB`
+  const dayStr = formatInTimeZone(d, TZ, 'd')
+  const monthIdx = parseInt(formatInTimeZone(d, TZ, 'M'), 10) - 1
+  const yearStr = formatInTimeZone(d, TZ, 'yyyy')
+  const timeStr = formatInTimeZone(d, TZ, 'HH.mm')
+  const monthName = INDO_MONTHS[monthIdx] || ''
+  return `${dayStr} ${monthName} ${yearStr}, ${timeStr} WIB`
+}
+
+/**
+ * Parses an ISO 8601 / TIMESTAMPTZ string to BigInt nanoseconds for sub-millisecond precision.
+ */
+export function parseIsoToNano(isoStr: string): bigint | null {
+  const ms = Date.parse(isoStr)
+  if (!Number.isFinite(ms)) return null
+
+  const match = isoStr.match(/\.(\d+)/)
+  if (!match) return BigInt(ms) * 1000000n
+
+  const digits = match[1]!
+  const secMs = BigInt(Math.floor(ms / 1000)) * 1000n
+  const fracNano = BigInt(digits.slice(0, 9).padEnd(9, '0'))
+
+  return secMs * 1000000n + fracNano
 }
 
 /**
@@ -83,22 +105,47 @@ export interface InventoryReportData {
 
 /**
  * Compiles report data for "Laporan Rincian Barang Persediaan" (Quantity-only).
+ * Uses keyset cursor pagination for categories, items, and transactions with a fixed time snapshot.
  */
 export async function compileInventoryReportData(
   supabase: SupabaseClient<Database>,
   dateFromStr: string,
   dateToStr: string,
 ): Promise<InventoryReportData> {
-  const startUtcIso = `${dateFromStr}T00:00:00+07:00`
-  const endUtcIso = `${dateToStr}T23:59:59.999+07:00`
-  const nowWibStr = formatIndonesianDateTime(new Date())
+  const exportNow = new Date()
+  const exportNowMs = exportNow.getTime()
+
+  const { startUtcIso, endUtcIso } = normalizeReportFilters({
+    from: dateFromStr,
+    to: dateToStr,
+  })
+  const nowWibStr = formatIndonesianDateTime(exportNow)
+
+  const startNano = parseIsoToNano(startUtcIso)
+  const requestedEndMs = Date.parse(endUtcIso)
+
+  if (!Number.isFinite(requestedEndMs) || startNano === null) {
+    throw new Error('Batas tanggal laporan tidak valid.')
+  }
+
+  const effectiveEndMs = Math.min(requestedEndMs, exportNowMs)
+  const effectiveEndUtcIso = new Date(effectiveEndMs).toISOString()
+  const effectiveEndNano = parseIsoToNano(effectiveEndUtcIso)
+
+  if (effectiveEndNano === null) {
+    throw new Error('Batas akhir laporan tidak valid.')
+  }
 
   // 1. Fetch app_settings
-  const { data: settings } = await supabase
+  const { data: settings, error: settingsError } = await supabase
     .from('app_settings')
     .select('institution_name, report_header_text')
     .limit(1)
     .maybeSingle()
+
+  if (settingsError) {
+    throw new Error(`Gagal mengambil data pengaturan instansi: ${settingsError.message}`)
+  }
 
   const institutionName = settings?.institution_name
     ? settings.institution_name.trim().toUpperCase()
@@ -107,30 +154,185 @@ export async function compileInventoryReportData(
     ? settings.report_header_text.trim()
     : 'LAPORAN RINCIAN BARANG PERSEDIAAN'
 
-  // 2. Fetch categories
-  const { data: categoriesData } = await supabase
-    .from('categories')
-    .select('id, name')
-    .order('name', { ascending: true })
+  const BATCH_SIZE = 1000
 
-  const categoryList = categoriesData || []
+  // 2. Fetch categories (Keyset cursor pagination on id ASC)
+  const categoryList: Array<{ id: string; name: string }> = []
+  let hasMoreCategories = true
+  let lastCatId: string | null = null
 
-  // 3. Fetch items with base units & category
-  const { data: itemsData } = await supabase
-    .from('items')
-    .select('id, sku, name, current_stock, is_active, category_id, base_unit_id, base_unit:units!base_unit_id(name, symbol), categories!category_id(name)')
-    .order('sku', { ascending: true })
+  while (hasMoreCategories) {
+    let catQuery = supabase
+      .from('categories')
+      .select('id, name')
 
-  const items = itemsData || []
+    if (lastCatId !== null) {
+      catQuery = catQuery.gt('id', lastCatId)
+    }
 
-  // 4. Fetch stock transactions up to endUtcIso
-  const { data: transactionsData } = await supabase
-    .from('stock_transactions')
-    .select('id, item_id, transaction_type, input_quantity, base_quantity, quantity_delta, stock_before, stock_after, transaction_at, is_reversed, original_transaction_id')
-    .lte('transaction_at', endUtcIso)
-    .order('transaction_at', { ascending: true })
+    const { data: catBatch, error: catError } = await catQuery
+      .order('id', { ascending: true })
+      .limit(BATCH_SIZE)
 
-  const allTransactions = transactionsData || []
+    if (catError) {
+      throw new Error(`Gagal mengambil data kategori ekspor: ${catError.message}`)
+    }
+
+    if (!catBatch || catBatch.length === 0) {
+      break
+    }
+
+    categoryList.push(...catBatch)
+
+    if (catBatch.length < BATCH_SIZE) {
+      hasMoreCategories = false
+    } else {
+      const lastCat = catBatch[catBatch.length - 1]
+      const nextCatId = lastCat?.id
+
+      if (typeof nextCatId !== 'string' || !UUID_REGEX.test(nextCatId)) {
+        throw new Error('Cursor kategori ekspor tidak valid.')
+      }
+
+      if (lastCatId !== null && nextCatId <= lastCatId) {
+        throw new Error('Cursor kategori ekspor tidak bergerak maju.')
+      }
+
+      lastCatId = nextCatId
+    }
+  }
+
+  // Sort categories deterministically: name ASC, id ASC
+  categoryList.sort((a, b) => {
+    const nameCmp = (a.name || '').localeCompare(b.name || '')
+    if (nameCmp !== 0) return nameCmp
+    return a.id.localeCompare(b.id)
+  })
+
+  // 3. Fetch items with base units & category (Keyset cursor pagination on id ASC)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const items: any[] = []
+  let hasMoreItems = true
+  let lastItemId: string | null = null
+
+  while (hasMoreItems) {
+    let itemQuery = supabase
+      .from('items')
+      .select(
+        'id, sku, name, current_stock, is_active, category_id, base_unit_id, base_unit:units!base_unit_id(name, symbol), categories!category_id(name)',
+      )
+
+    if (lastItemId !== null) {
+      itemQuery = itemQuery.gt('id', lastItemId)
+    }
+
+    const { data: itemBatch, error: itemError } = await itemQuery
+      .order('id', { ascending: true })
+      .limit(BATCH_SIZE)
+
+    if (itemError) {
+      throw new Error(`Gagal mengambil data barang ekspor: ${itemError.message}`)
+    }
+
+    if (!itemBatch || itemBatch.length === 0) {
+      break
+    }
+
+    items.push(...itemBatch)
+
+    if (itemBatch.length < BATCH_SIZE) {
+      hasMoreItems = false
+    } else {
+      const lastItem = itemBatch[itemBatch.length - 1]
+      const nextItemId = lastItem?.id
+
+      if (typeof nextItemId !== 'string' || !UUID_REGEX.test(nextItemId)) {
+        throw new Error('Cursor barang ekspor tidak valid.')
+      }
+
+      if (lastItemId !== null && nextItemId <= lastItemId) {
+        throw new Error('Cursor barang ekspor tidak bergerak maju.')
+      }
+
+      lastItemId = nextItemId
+    }
+  }
+
+  // Sort items deterministically: sku ASC, id ASC
+  items.sort((a, b) => {
+    const skuCmp = (a.sku || '').localeCompare(b.sku || '')
+    if (skuCmp !== 0) return skuCmp
+    return a.id.localeCompare(b.id)
+  })
+
+  // 4. KEYSET CURSOR PAGINATION: Batch-fetch ALL stock transactions up to effectiveEndUtcIso
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let allTransactions: any[] = []
+  let hasMoreTx = true
+
+  let lastTxAt: string | null = null
+  let lastId: string | null = null
+  let lastTxAtNano: bigint | null = null
+
+  while (hasMoreTx) {
+    let queryBuilder = supabase
+      .from('stock_transactions')
+      .select(
+        'id, item_id, transaction_type, input_quantity, base_quantity, quantity_delta, stock_before, stock_after, transaction_at, is_reversed, original_transaction_id',
+      )
+      .lt('transaction_at', effectiveEndUtcIso)
+
+    // Keyset cursor condition for ascending order: (transaction_at, id) > (lastTxAt, lastId)
+    if (lastTxAt !== null && lastId !== null) {
+      queryBuilder = queryBuilder.or(
+        `transaction_at.gt.${lastTxAt},and(transaction_at.eq.${lastTxAt},id.gt.${lastId})`,
+      )
+    }
+
+    const { data: batchData, error: batchError } = await queryBuilder
+      .order('transaction_at', { ascending: true })
+      .order('id', { ascending: true })
+      .limit(BATCH_SIZE)
+
+    if (batchError) {
+      throw new Error(`Gagal mengambil data persediaan ekspor: ${batchError.message}`)
+    }
+
+    if (!batchData || batchData.length === 0) {
+      break
+    }
+
+    allTransactions = allTransactions.concat(batchData)
+
+    if (batchData.length < BATCH_SIZE) {
+      hasMoreTx = false
+    } else {
+      const lastItem = batchData[batchData.length - 1]
+      const nextTxAt = lastItem?.transaction_at
+      const nextId = lastItem?.id
+
+      if (typeof nextTxAt !== 'string' || typeof nextId !== 'string' || !UUID_REGEX.test(nextId)) {
+        throw new Error('Cursor transaksi ekspor tidak valid.')
+      }
+
+      const nextTxAtNano = parseIsoToNano(nextTxAt)
+      if (nextTxAtNano === null) {
+        throw new Error('Timestamp cursor transaksi ekspor tidak valid.')
+      }
+
+      if (lastTxAtNano !== null && lastId !== null) {
+        const isAscending =
+          nextTxAtNano > lastTxAtNano || (nextTxAtNano === lastTxAtNano && nextId > lastId)
+        if (!isAscending) {
+          throw new Error('Cursor transaksi ekspor tidak bergerak maju.')
+        }
+      }
+
+      lastTxAt = nextTxAt
+      lastId = nextId
+      lastTxAtNano = nextTxAtNano
+    }
+  }
 
   // Group transactions by item_id
   const itemTxMap: Record<string, typeof allTransactions> = {}
@@ -140,18 +342,27 @@ export async function compileInventoryReportData(
     itemTxMap[tx.item_id] = list
   }
 
-  // Process per item
+  // Process per item using BigInt Nanosecond precision
   const itemSummaries: SummaryRowItem[] = []
 
   for (const item of items) {
     const txs = itemTxMap[item.id] || []
 
-    // Transactions before startUtcIso
-    const txsBefore = txs.filter((t) => t.transaction_at < startUtcIso)
-    // Transactions during [startUtcIso, endUtcIso]
-    const txsPeriod = txs.filter(
-      (t) => t.transaction_at >= startUtcIso && t.transaction_at <= endUtcIso
-    )
+    const txsBefore: typeof txs = []
+    const txsPeriod: typeof txs = []
+
+    for (const tx of txs) {
+      const tNano = parseIsoToNano(tx.transaction_at)
+      if (tNano === null) {
+        throw new Error(`Timestamp transaksi persediaan tidak valid: ${tx.transaction_at}`)
+      }
+
+      if (tNano < startNano) {
+        txsBefore.push(tx)
+      } else if (tNano >= startNano && tNano < effectiveEndNano) {
+        txsPeriod.push(tx)
+      }
+    }
 
     // Saldo Awal Qty
     let saldoAwalQty = 0
@@ -198,6 +409,7 @@ export async function compileInventoryReportData(
     if (item.is_active || hasActivity) {
       const baseUnitObj = item.base_unit as { name?: string; symbol?: string } | null
       const catObj = item.categories as { name?: string } | null
+
       itemSummaries.push({
         id: item.id,
         sku: item.sku,
@@ -260,6 +472,7 @@ export async function compileInventoryReportData(
 
 /**
  * Builds Excel workbook from InventoryReportData (Quantity-only).
+ * Strictly preserves original HEAD format, headers, labels, and column layout (8 columns A-H).
  */
 export async function buildInventoryReportWorkbook(
   reportData: InventoryReportData,
@@ -281,7 +494,7 @@ export async function buildInventoryReportWorkbook(
   }
 
   worksheet.columns = [
-    { width: 6 },  // A: No.
+    { width: 6 }, // A: No.
     { width: 14 }, // B: Kode Barang (SKU)
     { width: 34 }, // C: Nama Barang
     { width: 18 }, // D: Satuan
@@ -356,7 +569,7 @@ export async function buildInventoryReportWorkbook(
   let globalItemNumber = 1
 
   for (const catGroup of reportData.categories) {
-    // Category Header Row
+    // Category Header Row (RESTORED EXACT HEAD STYLING: font white, fill FF334155)
     worksheet.mergeCells(`A${rowIdx}:H${rowIdx}`)
     const catRow = worksheet.getRow(rowIdx)
     catRow.height = 22

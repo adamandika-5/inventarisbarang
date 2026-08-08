@@ -1,13 +1,14 @@
 import type { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import ReportsClient from './reports-client'
-import { formatInTimeZone } from 'date-fns-tz'
+import {
+  normalizeReportFilters,
+  parseReportSummary,
+} from '@/lib/reports/report-filters'
 
 export const metadata: Metadata = {
   title: 'Laporan — InventarisBarang Admin',
 }
-
-const TZ = 'Asia/Jakarta'
 
 export default async function ReportsPage({
   searchParams,
@@ -23,31 +24,20 @@ export default async function ReportsPage({
   const supabase = await createSupabaseServerClient()
   const params = await searchParams
 
-  // Default date range: last 30 days in WIB
-  const nowWib = formatInTimeZone(new Date(), TZ, 'yyyy-MM-dd')
-  const thirtyDaysAgoWib = formatInTimeZone(
-    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-    TZ,
-    'yyyy-MM-dd',
-  )
+  const {
+    safeFrom,
+    safeTo,
+    startUtcIso,
+    endUtcIso,
+    typeFilter,
+    itemFilter,
+    page,
+    isInvalidDateRange,
+  } = normalizeReportFilters(params)
 
-  const dateFrom = params.from ?? thirtyDaysAgoWib
-  const dateTo = params.to ?? nowWib
-  const rawType = (params.type ?? '').trim().toUpperCase()
-  const typeFilter = rawType === 'ALL' ? '' : rawType
-  const itemFilter = (params.item ?? '').trim()
-  const page = Math.max(1, parseInt(params.page ?? '1', 10))
   const pageSize = 25
 
-  // Validate dates — if invalid, use defaults
-  const safeFrom = /^\d{4}-\d{2}-\d{2}$/.test(dateFrom) ? dateFrom : thirtyDaysAgoWib
-  const safeTo = /^\d{4}-\d{2}-\d{2}$/.test(dateTo) ? dateTo : nowWib
-
-  // Convert WIB dates to UTC range for DB queries
-  const fromUtc = `${safeFrom}T00:00:00+07:00`
-  const toUtc = `${safeTo}T23:59:59+07:00`
-
-  // Helper to apply type filter to query
+  // ── Helper to apply transaction type filter ──────────────────────────────
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const applyTypeFilter = (queryBuilder: any, type?: string) => {
     if (!type || type === 'ALL') return queryBuilder
@@ -60,31 +50,17 @@ export default async function ReportsPage({
     return queryBuilder
   }
 
-  // ── Summary stats ────────────────────────────────────────────────────────────
-
-  let summaryQuery = supabase
-    .from('stock_transactions')
-    .select('transaction_type,base_quantity,quantity_delta')
-    .gte('transaction_at', fromUtc)
-    .lte('transaction_at', toUtc)
-
-  summaryQuery = applyTypeFilter(summaryQuery, typeFilter)
-
-  if (itemFilter) {
-    summaryQuery = summaryQuery.eq('item_id', itemFilter)
-  }
-
-  // ── Transactions table ───────────────────────────────────────────────────────
-
+  // ── Transactions table query (Server-side paginated, stable sort) ─────────
   let txQuery = supabase
     .from('stock_transactions')
     .select(
       'id,transaction_number,transaction_type,input_quantity,base_quantity,quantity_delta,transaction_at,stock_before,stock_after,reason,is_reversed,items!item_id(id,sku,name),units!unit_id(id,name,symbol),profiles!performed_by(id,full_name,username)',
       { count: 'exact' },
     )
-    .gte('transaction_at', fromUtc)
-    .lte('transaction_at', toUtc)
+    .gte('transaction_at', startUtcIso)
+    .lt('transaction_at', endUtcIso)
     .order('transaction_at', { ascending: false })
+    .order('id', { ascending: false })
     .range((page - 1) * pageSize, page * pageSize - 1)
 
   txQuery = applyTypeFilter(txQuery, typeFilter)
@@ -93,19 +69,30 @@ export default async function ReportsPage({
     txQuery = txQuery.eq('item_id', itemFilter)
   }
 
+  // ── Low stock items query (Server-side filtered via view) ──────────────
+  const lowStockQuery = supabase
+    .from('employee_items_view')
+    .select('id,sku,name,current_stock,minimum_stock,base_unit_symbol')
+    .in('stock_status', ['HABIS', 'HAMPIR_HABIS'])
+    .order('current_stock', { ascending: true })
+    .limit(20)
+
   const reportsStart = performance.now()
+
+  // ── Parallel execution of summary RPC, transactions page, and low stock ──
   const [
-    { data: summaryData, error: summaryError },
+    summaryRpcResult,
     { data: transactions, count: txCount, error: txError },
-    { data: allActiveItems, error: lowStockError },
+    { data: rawLowStockData, error: lowStockError },
   ] = await Promise.all([
-    summaryQuery,
+    supabase.rpc('get_report_summary', {
+      p_from_at: startUtcIso,
+      p_to_at: endUtcIso,
+      p_type: typeFilter === 'ALL' ? null : typeFilter,
+      p_item_id: itemFilter || null,
+    }),
     txQuery,
-    supabase
-      .from('items')
-      .select('id,sku,name,current_stock,minimum_stock,base_unit:units!base_unit_id(id,name,symbol)')
-      .eq('is_active', true)
-      .order('current_stock', { ascending: true }),
+    lowStockQuery,
   ])
 
   if (process.env.NODE_ENV === 'development') {
@@ -113,56 +100,31 @@ export default async function ReportsPage({
     console.log(`[PERF] ReportsPage parallel data queries: ${(performance.now() - reportsStart).toFixed(2)}ms`)
   }
 
-  type RawItem = {
+  const parsedSummary = parseReportSummary(summaryRpcResult.data, !!summaryRpcResult.error)
+
+  type ViewLowStockItem = {
     id: string
     sku: string
     name: string
     current_stock: number
     minimum_stock: number
-    base_unit: { id: string; name: string; symbol: string } | Array<{ id: string; name: string; symbol: string }> | null
+    base_unit_symbol: string
   }
 
-  const lowStockItems = ((allActiveItems ?? []) as unknown as RawItem[])
-    .filter((item) => Number(item.current_stock) <= Number(item.minimum_stock))
-    .slice(0, 20)
-    .map((item) => ({
-      id: item.id,
-      sku: item.sku,
-      name: item.name,
-      current_stock: item.current_stock,
-      minimum_stock: item.minimum_stock,
-      base_unit: Array.isArray(item.base_unit) ? item.base_unit[0] ?? null : item.base_unit,
-    }))
+  const lowStockItems = ((rawLowStockData ?? []) as ViewLowStockItem[]).map((item) => ({
+    id: item.id,
+    sku: item.sku,
+    name: item.name,
+    current_stock: item.current_stock,
+    minimum_stock: item.minimum_stock,
+    base_unit: {
+      id: '',
+      name: '',
+      symbol: item.base_unit_symbol,
+    },
+  }))
 
-  // Compute summary (totalIn = sum of positive deltas, totalOut = sum of negative deltas as abs)
-  const summary = {
-    totalIn: 0,
-    totalOut: 0,
-    totalAdjustmentIn: 0,
-    totalAdjustmentOut: 0,
-    totalReversal: 0,
-    totalTransactions: (summaryData ?? []).length,
-    lowStockCount: (lowStockItems ?? []).length,
-  }
-
-  for (const tx of summaryData ?? []) {
-    const delta = Number(tx.quantity_delta ?? 0)
-    if (delta > 0) {
-      summary.totalIn += delta
-    } else if (delta < 0) {
-      summary.totalOut += Math.abs(delta)
-    }
-
-    if (tx.transaction_type === 'ADJUSTMENT_IN') {
-      summary.totalAdjustmentIn += delta
-    } else if (tx.transaction_type === 'ADJUSTMENT_OUT') {
-      summary.totalAdjustmentOut += Math.abs(delta)
-    } else if (tx.transaction_type === 'REVERSAL') {
-      summary.totalReversal++
-    }
-  }
-
-  const hasError = !!summaryError || !!txError
+  const hasError = parsedSummary.hasError || !!txError
 
   return (
     <div>
@@ -173,8 +135,16 @@ export default async function ReportsPage({
         </p>
       </div>
 
+      {isInvalidDateRange && (
+        <div className="alert-error mb-4" role="alert">
+          Tanggal awal (Dari Tanggal) tidak boleh lebih besar dari tanggal akhir (Sampai Tanggal).
+        </div>
+      )}
+
       {hasError && (
-        <div className="alert-error mb-4">Gagal memuat sebagian data laporan. Coba muat ulang halaman.</div>
+        <div className="alert-error mb-4" role="alert">
+          Gagal memuat sebagian data laporan. Coba muat ulang halaman.
+        </div>
       )}
 
       <ReportsClient
@@ -182,12 +152,21 @@ export default async function ReportsPage({
         dateTo={safeTo}
         typeFilter={typeFilter}
         itemFilter={itemFilter}
-        summary={summary}
+        summary={{
+          totalIn: parsedSummary.totalIn,
+          totalOut: parsedSummary.totalOut,
+          totalAdjustmentIn: parsedSummary.totalAdjustmentIn,
+          totalAdjustmentOut: parsedSummary.totalAdjustmentOut,
+          totalReversal: parsedSummary.totalReversal,
+          totalTransactions: parsedSummary.totalTransactions,
+          lowStockCount: parsedSummary.lowStockCount,
+        }}
+        summaryError={parsedSummary.hasError}
         transactions={transactions ?? []}
         totalCount={txCount ?? 0}
         page={page}
         pageSize={pageSize}
-        lowStockItems={lowStockItems ?? []}
+        lowStockItems={lowStockItems}
         lowStockError={!!lowStockError}
       />
     </div>

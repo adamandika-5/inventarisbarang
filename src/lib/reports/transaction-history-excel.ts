@@ -3,8 +3,10 @@ import { formatInTimeZone } from 'date-fns-tz'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database, TransactionType } from '@/types/database'
 import { sanitizeUserString } from './inventory-summary-excel'
+import { normalizeReportFilters } from './report-filters'
 
 const TZ = 'Asia/Jakarta'
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 const INDO_MONTHS = [
   'Januari',
@@ -75,8 +77,110 @@ const TYPE_LABELS: Record<TransactionType, string> = {
   REVERSAL: 'Koreksi',
 }
 
+export interface LoadTransactionHistoryRowsParams {
+  startUtcIso: string
+  effectiveEndUtcIso: string
+  typeFilter?: string
+  itemFilter?: string
+}
+
+/**
+ * Loads ALL transaction history rows within specified date range using keyset cursor pagination (transaction_at DESC, id DESC).
+ * Uses BATCH_SIZE = 1000 with limit() instead of range().
+ */
+export async function loadTransactionHistoryRows(
+  supabase: SupabaseClient<Database>,
+  params: LoadTransactionHistoryRowsParams,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+): Promise<any[]> {
+  const validTypes = ['IN', 'OUT', 'INITIAL', 'ADJUSTMENT_IN', 'ADJUSTMENT_OUT', 'REVERSAL']
+  const BATCH_SIZE = 1000
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let txList: any[] = []
+  let hasMore = true
+
+  let lastTxAt: string | null = null
+  let lastId: string | null = null
+  let lastTxAtMs: number | null = null
+
+  while (hasMore) {
+    let queryBuilder = supabase
+      .from('stock_transactions')
+      .select(
+        'id, transaction_number, item_id, transaction_type, input_quantity, base_quantity, quantity_delta, performed_by, transaction_at, stock_before, stock_after, reason, original_transaction_id, is_reversed, reversal_transaction_id, items!item_id(id, sku, name, category_id, categories!category_id(name)), units!unit_id(id, name, symbol), profiles!performed_by(id, full_name, username)',
+      )
+      .gte('transaction_at', params.startUtcIso)
+      .lt('transaction_at', params.effectiveEndUtcIso)
+
+    // Keyset cursor condition for descending order: (transaction_at, id) < (lastTxAt, lastId)
+    if (lastTxAt !== null && lastId !== null) {
+      queryBuilder = queryBuilder.or(
+        `transaction_at.lt.${lastTxAt},and(transaction_at.eq.${lastTxAt},id.lt.${lastId})`,
+      )
+    }
+
+    if (params.typeFilter === 'ADJUSTMENT') {
+      queryBuilder = queryBuilder.in('transaction_type', ['ADJUSTMENT_IN', 'ADJUSTMENT_OUT'])
+    } else if (params.typeFilter && params.typeFilter !== 'ALL' && validTypes.includes(params.typeFilter)) {
+      queryBuilder = queryBuilder.eq('transaction_type', params.typeFilter as TransactionType)
+    }
+
+    if (params.itemFilter) {
+      queryBuilder = queryBuilder.eq('item_id', params.itemFilter)
+    }
+
+    const { data: batchData, error: batchError } = await queryBuilder
+      .order('transaction_at', { ascending: false })
+      .order('id', { ascending: false })
+      .limit(BATCH_SIZE)
+
+    if (batchError) {
+      throw new Error(`Gagal mengambil data transaksi ekspor: ${batchError.message}`)
+    }
+
+    if (!batchData || batchData.length === 0) {
+      break
+    }
+
+    txList = txList.concat(batchData)
+
+    if (batchData.length < BATCH_SIZE) {
+      hasMore = false
+    } else {
+      // Exactly BATCH_SIZE returned, more batches may exist: validate cursor for next batch
+      const lastItem = batchData[batchData.length - 1]
+      const nextTxAt = lastItem?.transaction_at
+      const nextId = lastItem?.id
+
+      if (typeof nextTxAt !== 'string' || typeof nextId !== 'string' || !UUID_REGEX.test(nextId)) {
+        throw new Error('Cursor transaksi ekspor tidak valid.')
+      }
+
+      const nextTxAtMs = Date.parse(nextTxAt)
+      if (!Number.isFinite(nextTxAtMs)) {
+        throw new Error('Timestamp cursor transaksi ekspor tidak valid.')
+      }
+
+      if (lastTxAtMs !== null && lastId !== null) {
+        const isDescending =
+          nextTxAtMs < lastTxAtMs || (nextTxAtMs === lastTxAtMs && nextId < lastId)
+        if (!isDescending) {
+          throw new Error('Cursor transaksi ekspor tidak bergerak menurun.')
+        }
+      }
+
+      lastTxAt = nextTxAt
+      lastId = nextId
+      lastTxAtMs = nextTxAtMs
+    }
+  }
+
+  return txList
+}
+
 /**
  * Builds Excel Workbook for "Riwayat Transaksi" (Single Sheet, Quantity-only).
+ * Uses keyset cursor pagination (transaction_at DESC, id DESC) with a fixed time snapshot to fetch all matching rows.
  */
 export async function buildTransactionHistoryWorkbook(
   supabase: SupabaseClient<Database>,
@@ -84,8 +188,22 @@ export async function buildTransactionHistoryWorkbook(
 ): Promise<Buffer> {
   const { dateFromStr, dateToStr, typeFilter, itemFilter } = params
 
-  const startUtc = `${dateFromStr}T00:00:00+07:00`
-  const endUtc = `${dateToStr}T23:59:59.999+07:00`
+  const normalized = normalizeReportFilters({
+    from: dateFromStr,
+    to: dateToStr,
+    type: typeFilter,
+    item: itemFilter,
+  })
+
+  // Compare absolute timestamps for time snapshot
+  const requestedEndMs = Date.parse(normalized.endUtcIso)
+  const exportNowMs = Date.now()
+
+  if (!Number.isFinite(requestedEndMs)) {
+    throw new Error('Batas akhir laporan tidak valid.')
+  }
+
+  const effectiveEndUtcIso = new Date(Math.min(requestedEndMs, exportNowMs)).toISOString()
 
   // 1. Fetch app_settings for institution info if not supplied
   let instName = params.institutionName
@@ -105,50 +223,41 @@ export async function buildTransactionHistoryWorkbook(
     instName && instName.trim() !== '' ? instName.trim().toUpperCase() : 'NAMA INSTANSI BELUM DIATUR'
   const headerTextDisplay =
     headerText && headerText.trim() !== '' ? headerText.trim() : 'LAPORAN RIWAYAT TRANSAKSI STOK'
-  const typeFilterLabel = getTypeFilterLabel(typeFilter)
+  const typeFilterLabel = getTypeFilterLabel(normalized.typeFilter)
   const generatedAtWib = formatIndonesianDateTime(new Date())
-  const dateRangeDisplay = `${formatIndonesianDateStr(dateFromStr)} s/d ${formatIndonesianDateStr(dateToStr)}`
+  const dateRangeDisplay = `${formatIndonesianDateStr(normalized.safeFrom)} s/d ${formatIndonesianDateStr(normalized.safeTo)}`
 
-  // 2. Fetch transactions in requested date range
-  const validTypes = ['IN', 'OUT', 'INITIAL', 'ADJUSTMENT_IN', 'ADJUSTMENT_OUT', 'REVERSAL']
-  let query = supabase
-    .from('stock_transactions')
-    .select(
-      'id, transaction_number, item_id, transaction_type, input_quantity, base_quantity, quantity_delta, performed_by, transaction_at, stock_before, stock_after, reason, original_transaction_id, is_reversed, reversal_transaction_id, items!item_id(id, sku, name, category_id, categories!category_id(name)), units!unit_id(id, name, symbol), profiles!performed_by(id, full_name, username)',
-    )
-    .gte('transaction_at', startUtc)
-    .lte('transaction_at', endUtc)
-    .order('transaction_at', { ascending: false })
-    .limit(10000)
+  // 2. Fetch ALL transactions in requested date range using extracted loader
+  const txList = await loadTransactionHistoryRows(supabase, {
+    startUtcIso: normalized.startUtcIso,
+    effectiveEndUtcIso,
+    typeFilter: normalized.typeFilter,
+    itemFilter: normalized.itemFilter,
+  })
 
-  if (typeFilter === 'ADJUSTMENT') {
-    query = query.in('transaction_type', ['ADJUSTMENT_IN', 'ADJUSTMENT_OUT'])
-  } else if (typeFilter && typeFilter !== 'ALL' && validTypes.includes(typeFilter)) {
-    query = query.eq('transaction_type', typeFilter as TransactionType)
-  }
-
-  if (itemFilter) {
-    query = query.eq('item_id', itemFilter)
-  }
-
-  const { data: transactions } = await query
-  const txList = transactions || []
-
-  // Collect original_transaction_ids to resolve reference transaction numbers for reversals
+  // 3. Resolve reference transaction numbers for reversals in CHUNKS of 500 IDs
   const origTxIds = Array.from(
     new Set(txList.map((t) => t.original_transaction_id).filter((id): id is string => Boolean(id))),
   )
   const refTxNoMap: Record<string, string> = {}
 
   if (origTxIds.length > 0) {
-    const { data: origTxData } = await supabase
-      .from('stock_transactions')
-      .select('id, transaction_number')
-      .in('id', origTxIds)
+    const CHUNK_SIZE = 500
+    for (let i = 0; i < origTxIds.length; i += CHUNK_SIZE) {
+      const chunkIds = origTxIds.slice(i, i + CHUNK_SIZE)
+      const { data: origTxData, error: origTxError } = await supabase
+        .from('stock_transactions')
+        .select('id, transaction_number')
+        .in('id', chunkIds)
 
-    if (origTxData) {
-      for (const ot of origTxData) {
-        refTxNoMap[ot.id] = ot.transaction_number
+      if (origTxError) {
+        throw new Error(`Gagal mengambil nomor transaksi referensi: ${origTxError.message}`)
+      }
+
+      if (origTxData) {
+        for (const ot of origTxData) {
+          refTxNoMap[ot.id] = ot.transaction_number
+        }
       }
     }
   }
@@ -170,7 +279,7 @@ export async function buildTransactionHistoryWorkbook(
     fitToHeight: 0,
   }
 
-  // 3. Column Widths (12 columns: A to L)
+  // Column Widths (12 columns: A to L)
   worksheet.columns = [
     { width: 6 },  // A: No.
     { width: 22 }, // B: Tanggal dan Waktu (WIB)
@@ -266,7 +375,8 @@ export async function buildTransactionHistoryWorkbook(
     const profileObj = t.profiles as { full_name?: string; username?: string } | null
 
     const dtWib = t.transaction_at ? formatInTimeZone(new Date(t.transaction_at), TZ, 'dd/MM/yyyy HH:mm') : ''
-    const txTypeLabel = TYPE_LABELS[t.transaction_type] || t.transaction_type
+    const txType = t.transaction_type as TransactionType
+    const txTypeLabel = TYPE_LABELS[txType] || t.transaction_type
     const skuDisplay = itemObj?.sku || ''
     const nameDisplay = sanitizeUserString(itemObj?.name)
     const categoryDisplay = itemObj?.categories?.name || 'Lainnya'

@@ -4,9 +4,7 @@ import {
   compileInventoryReportData,
   buildInventoryReportWorkbook,
 } from '@/lib/reports/inventory-summary-excel'
-import { formatInTimeZone } from 'date-fns-tz'
-
-const TZ = 'Asia/Jakarta'
+import { normalizeReportFilters } from '@/lib/reports/report-filters'
 
 /**
  * GET /api/reports/inventory-summary?from=YYYY-MM-DD&to=YYYY-MM-DD
@@ -36,30 +34,31 @@ export async function GET(request: NextRequest) {
 
   try {
     const searchParams = request.nextUrl.searchParams
+    const rawFrom = searchParams.get('from')
+    const rawTo = searchParams.get('to')
 
-    const nowWib = formatInTimeZone(new Date(), TZ, 'yyyy-MM-dd')
-    const thirtyDaysAgoWib = formatInTimeZone(
-      new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
-      TZ,
-      'yyyy-MM-dd'
-    )
+    const normalized = normalizeReportFilters({
+      from: rawFrom,
+      to: rawTo,
+    })
 
-    const rawFrom = searchParams.get('from') || thirtyDaysAgoWib
-    const rawTo = searchParams.get('to') || nowWib
-
-    const safeFrom = /^\d{4}-\d{2}-\d{2}$/.test(rawFrom) ? rawFrom : thirtyDaysAgoWib
-    const safeTo = /^\d{4}-\d{2}-\d{2}$/.test(rawTo) ? rawTo : nowWib
+    if (normalized.isInvalidDateRange) {
+      return NextResponse.json(
+        { error: 'Tanggal awal tidak boleh lebih besar dari tanggal akhir.' },
+        { status: 400 },
+      )
+    }
 
     // Format dates for filename: DD-MM-YYYY
-    const fromParts = safeFrom.split('-')
-    const toParts = safeTo.split('-')
+    const fromParts = normalized.safeFrom.split('-')
+    const toParts = normalized.safeTo.split('-')
     const formattedFrom = `${fromParts[2]}-${fromParts[1]}-${fromParts[0]}`
     const formattedTo = `${toParts[2]}-${toParts[1]}-${toParts[0]}`
 
     const filename = `laporan-rincian-persediaan-${formattedFrom}-sampai-${formattedTo}.xlsx`
 
     // Compile report data & build Excel workbook
-    const reportData = await compileInventoryReportData(supabase, safeFrom, safeTo)
+    const reportData = await compileInventoryReportData(supabase, normalized.safeFrom, normalized.safeTo)
     const excelBuffer = await buildInventoryReportWorkbook(reportData)
 
     return new NextResponse(new Uint8Array(excelBuffer), {

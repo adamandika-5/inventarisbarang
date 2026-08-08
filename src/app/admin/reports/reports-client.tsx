@@ -79,6 +79,7 @@ interface ReportsClientProps {
   typeFilter: string
   itemFilter: string
   summary: Summary
+  summaryError?: boolean
   transactions: Transaction[]
   totalCount: number
   page: number
@@ -123,7 +124,9 @@ export default function ReportsClient({
   dateFrom,
   dateTo,
   typeFilter,
+  itemFilter,
   summary,
+  summaryError = false,
   transactions,
   totalCount,
   page,
@@ -253,6 +256,7 @@ export default function ReportsClient({
     setDownloadingDetail(true)
     let url = `/api/reports/transactions-detail?from=${encodeURIComponent(localFrom)}&to=${encodeURIComponent(localTo)}`
     if (localType && localType !== 'ALL') url += `&type=${encodeURIComponent(localType)}`
+    if (itemFilter) url += `&item=${encodeURIComponent(itemFilter)}`
     await downloadExcel(url, `riwayat-transaksi-${localFrom}-sampai-${localTo}.xlsx`)
     setDownloadingDetail(false)
   }
@@ -342,25 +346,25 @@ export default function ReportsClient({
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <SummaryCard
           label="Total Masuk"
-          value={summary.totalIn.toLocaleString('id-ID')}
+          value={summaryError ? '—' : summary.totalIn.toLocaleString('id-ID')}
           color="green"
           icon="↑"
         />
         <SummaryCard
           label="Total Keluar"
-          value={summary.totalOut.toLocaleString('id-ID')}
+          value={summaryError ? '—' : summary.totalOut.toLocaleString('id-ID')}
           color="red"
           icon="↓"
         />
         <SummaryCard
           label="Transaksi"
-          value={summary.totalTransactions.toLocaleString('id-ID')}
+          value={summaryError ? '—' : summary.totalTransactions.toLocaleString('id-ID')}
           color="blue"
           icon="≡"
         />
         <SummaryCard
           label="Stok Rendah"
-          value={summary.lowStockCount.toLocaleString('id-ID')}
+          value={summaryError ? '—' : summary.lowStockCount.toLocaleString('id-ID')}
           color={summary.lowStockCount > 0 ? 'orange' : 'gray'}
           icon="⚠"
         />
