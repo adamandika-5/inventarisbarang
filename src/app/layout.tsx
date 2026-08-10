@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { themeScript } from '@/lib/theme-script'
+import { ServiceWorkerRegistration } from '@/components/service-worker-registration'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -14,6 +15,10 @@ export const metadata: Metadata = {
   robots: {
     index: false, // Internal app, no public indexing
     follow: false,
+  },
+  icons: {
+    icon: '/icons/icon-192.png',
+    apple: '/icons/icon-512.png',
   },
 }
 
@@ -38,7 +43,10 @@ export default function RootLayout({
         {/* eslint-disable-next-line react/no-danger */}
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className={`${inter.variable} font-sans antialiased`}>{children}</body>
+      <body className={`${inter.variable} font-sans antialiased`}>
+        {children}
+        <ServiceWorkerRegistration />
+      </body>
     </html>
   )
 }

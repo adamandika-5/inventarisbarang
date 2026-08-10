@@ -8,9 +8,9 @@ Sistem pengelolaan persediaan alat tulis kantor (ATK) berbasis web.
 - Scan barcode barang untuk pengambilan
 - Dashboard admin dan pegawai yang terpisah
 - Pengelolaan master data (barang, kategori, satuan)
-- Laporan stok, barang masuk/keluar, nilai persediaan
-- Impor Excel dan ekspor laporan
-- Cetak barcode label PDF A4
+- Laporan stok, barang masuk/keluar, dan rincian persediaan
+- Ekspor laporan ke Excel
+- Cetak barcode melalui dialog print browser
 - PWA — dapat dipasang di layar utama
 
 ## Tech Stack
@@ -18,11 +18,11 @@ Sistem pengelolaan persediaan alat tulis kantor (ATK) berbasis web.
 - **Next.js 15** (App Router) + TypeScript strict
 - **Tailwind CSS**
 - **Supabase** (PostgreSQL + Auth)
-- **Vercel** (hosting target)
+- **Vercel** (hosting target, Node.js 24.x)
 
 ## Prasyarat
 
-- Node.js LTS (v20+)
+- Node.js 24.x (LTS)
 - Akun Supabase
 - Akun Vercel (untuk deployment)
 
@@ -42,6 +42,7 @@ npm install
 2. Catat Project URL dan anon key dari **Settings → API**
 3. Catat service role key dari **Settings → API** (jangan dibagikan!)
 4. Nonaktifkan self-signup di **Authentication → Providers → Email → Enable sign-ups** (matikan)
+5. Rekomendasikan Functions Region **Singapore (`sin1`)** untuk latensi terbaik
 
 ### 3. Konfigurasi Environment
 
@@ -57,6 +58,14 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key  # JANGAN awali dengan NEXT_PUBLIC_
 ```
 
+Environment variable yang dibutuhkan:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Jangan menambahkan `NODE_ENV` — Vercel mengaturnya secara otomatis.
+
 ### 4. Jalankan Migration Database
 
 Di Supabase Dashboard → **SQL Editor**, jalankan file berikut secara berurutan:
@@ -65,6 +74,15 @@ Di Supabase Dashboard → **SQL Editor**, jalankan file berikut secara berurutan
 2. `supabase/migrations/002_rls_and_grants.sql`
 3. `supabase/migrations/003_stock_rpc_functions.sql`
 4. `supabase/migrations/004_admin_bootstrap_function.sql`
+5. `supabase/migrations/005_audit_log_and_item_active.sql`
+6. `supabase/migrations/006_adjustment_and_reversal_rpcs.sql`
+7. `supabase/migrations/007_complete_forced_password_change.sql`
+8. `supabase/migrations/008_audit_log_rpc_fix.sql`
+9. `supabase/migrations/009_barcode_and_conversion.sql`
+10. `supabase/migrations/010_camera_scan_rpc.sql`
+11. `supabase/migrations/011_quantity_only_stock_rpcs.sql`
+12. `supabase/migrations/012_dashboard_stats_rpc.sql`
+13. `supabase/migrations/013_report_summary_rpc.sql`
 
 Atau jika menggunakan Supabase CLI:
 
@@ -112,7 +130,8 @@ npm run build
    - `NEXT_PUBLIC_SUPABASE_URL`
    - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
-4. Deploy
+4. Pilih Functions Region **Singapore (`sin1`)**
+5. Deploy pertama kali melalui **Preview** untuk validasi sebelum production
 
 ## Keamanan
 
