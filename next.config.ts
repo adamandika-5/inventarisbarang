@@ -4,12 +4,6 @@ const nextConfig: NextConfig = {
   devIndicators: {
     position: 'bottom-right',
   },
-  // Use Node.js runtime for routes requiring PDF/Excel generation
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '6mb', // Allow Excel file uploads up to ~5MB + overhead
-    },
-  },
   // Security headers
   async headers() {
     return [
@@ -32,7 +26,7 @@ const nextConfig: NextConfig = {
             key: 'Permissions-Policy',
             // NOTE: camera is allowed for barcode scanning feature
             // TODO(security): Restrict camera permission to only the scan page path when browser support improves
-            value: 'camera=self, microphone=(), geolocation=()',
+            value: 'camera=(self), microphone=(), geolocation=()',
           },
           {
             key: 'X-DNS-Prefetch-Control',

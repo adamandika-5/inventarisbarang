@@ -3,13 +3,17 @@ import { ScanSuccessFeedbackManager, scanSuccessFeedback } from '@/lib/scan-succ
 
 describe('ScanSuccessFeedbackManager Unit Tests', () => {
   let originalNavigator: typeof global.navigator
+  let originalPlay: typeof HTMLMediaElement.prototype.play
 
   beforeEach(() => {
     originalNavigator = global.navigator
+    originalPlay = HTMLMediaElement.prototype.play
+    HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined)
     scanSuccessFeedback.resetSession()
   })
 
   afterEach(() => {
+    HTMLMediaElement.prototype.play = originalPlay
     Object.defineProperty(global, 'navigator', {
       value: originalNavigator,
       writable: true,

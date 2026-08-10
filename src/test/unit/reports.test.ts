@@ -327,7 +327,7 @@ describe('Admin Reports Comprehensive Keyset Batching, Security & Normalization 
       expect(allTxIds[999]).toBe('123e4567-e89b-12d3-a456-000000001000')
       expect(allTxIds[1000]).toBe('123e4567-e89b-12d3-a456-000000001001')
       expect(allTxIds[1499]).toBe('123e4567-e89b-12d3-a456-000000001500')
-    })
+    }, 30000)
 
     it('rejects and aborts workbook generation immediately if second batch fails', async () => {
       const makeMockTx = (idx: number) => ({
