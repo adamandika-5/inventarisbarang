@@ -180,32 +180,73 @@ export default function AdminSidebar({ fullName }: AdminSidebarProps) {
   }
 
   return (
-    <aside className="fixed top-0 bottom-0 left-0 z-40 hidden w-64 h-dvh flex-col overflow-hidden bg-white dark:bg-[#101D31] border-r border-slate-200 dark:border-white/10 shadow-sm transition-colors lg:flex">
+    <aside className="fixed top-0 bottom-0 left-0 z-40 hidden w-64 h-dvh flex-col overflow-hidden bg-white dark:bg-[#101D31] border-r border-slate-200/80 dark:border-white/10 shadow-sm transition-colors lg:flex">
       {/* Brand Header */}
-      <header className="flex h-16 shrink-0 items-center px-6 border-b border-slate-200 dark:border-white/10">
-        <span className="text-lg font-bold text-slate-900 dark:text-white tracking-tight">Inventaris Barang</span>
+      <header className="flex h-16 shrink-0 items-center px-6 border-b border-slate-200/80 dark:border-white/10">
+        <div className="flex items-center gap-2.5">
+          <div className="relative flex h-8 w-8 items-center justify-center shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/branding/logo-sistem-v2.png"
+              alt="Logo Inventaris Barang"
+              className="h-8 w-8 object-contain"
+              onError={(e) => {
+                const target = e.currentTarget
+                target.style.display = 'none'
+                const parent = target.parentElement
+                if (parent && !parent.querySelector('.fallback-monogram')) {
+                  const span = document.createElement('span')
+                  span.className = 'fallback-monogram flex h-8 w-8 items-center justify-center rounded-lg bg-[#1F5B87] text-white font-bold text-sm shadow-sm'
+                  span.innerText = 'IB'
+                  parent.appendChild(span)
+                }
+              }}
+            />
+          </div>
+          <div>
+            <span className="block text-sm font-bold leading-tight text-slate-900 dark:text-white tracking-tight">
+              Inventaris Barang
+            </span>
+            <span className="block text-[11px] font-medium text-slate-500 dark:text-slate-400">
+              BPS Kota Mojokerto
+            </span>
+          </div>
+        </div>
       </header>
 
-      {/* Navigation Menu */}
-      <nav className="min-h-0 flex-1 overflow-y-auto px-3 py-4" aria-label="Menu admin">
-        <ul className="space-y-0.5">
+      {/* Navigation Menu with subtle thin scrollbar */}
+      <nav
+        className="min-h-0 flex-1 overflow-y-auto px-3 py-3 [scrollbar-width:thin] [scrollbar-color:transparent_transparent] hover:[scrollbar-color:#cbd5e1_transparent] dark:hover:[scrollbar-color:#334155_transparent]"
+        aria-label="Menu admin"
+      >
+        <ul className="space-y-1">
           {navItems.map((item) => {
             const active = isActive(item.href, item.exact)
             return (
               <li key={item.href}>
                 <Link
                   href={item.href}
-                  className={`flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
+                  className={`group relative flex items-center gap-3 rounded-lg px-3 py-2 text-xs sm:text-[13px] font-medium transition-colors ${
                     active
-                      ? 'bg-blue-50 dark:bg-[#22D3EE]/10 text-blue-700 dark:text-[#22D3EE] font-semibold'
-                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#203552] hover:text-slate-900 dark:hover:text-white'
+                      ? 'bg-blue-50 dark:bg-cyan-500/10 text-blue-700 dark:text-cyan-300 font-semibold'
+                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100/80 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
                   }`}
                   aria-current={active ? 'page' : undefined}
                 >
-                  <span className={active ? 'text-blue-600 dark:text-[#22D3EE]' : 'text-slate-400 dark:text-slate-400'}>
+                  {/* Subtle active indicator pill */}
+                  {active && (
+                    <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r-full bg-blue-600 dark:bg-cyan-400" />
+                  )}
+                  <span
+                    className={`transition-colors ${
+                      active
+                        ? 'text-blue-600 dark:text-cyan-400'
+                        : 'text-slate-400 dark:text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-200'
+                    }`}
+                  >
                     {item.icon}
                   </span>
-                  {item.label}
+                  <span className="truncate">{item.label}</span>
                 </Link>
               </li>
             )
@@ -213,28 +254,28 @@ export default function AdminSidebar({ fullName }: AdminSidebarProps) {
         </ul>
       </nav>
 
-      {/* User Footer — shrink-0 with safe-area padding */}
-      <footer className="shrink-0 p-4 border-t border-slate-200 dark:border-white/10 bg-white dark:bg-[#101D31]">
-        <div className="flex items-center gap-3">
-          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100 dark:bg-[#22D3EE]/20 text-sm font-bold text-blue-700 dark:text-[#22D3EE]">
+      {/* User Footer */}
+      <footer className="shrink-0 p-3.5 border-t border-slate-200/80 dark:border-white/10 bg-white dark:bg-[#101D31]">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 dark:bg-cyan-500/20 text-xs font-bold text-blue-700 dark:text-cyan-300">
             {fullName.charAt(0).toUpperCase()}
           </div>
-          <div className="flex-1 overflow-hidden">
-            <p className="truncate text-sm font-medium text-slate-900 dark:text-white">{fullName}</p>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Admin</p>
+          <div className="flex-1 min-w-0">
+            <p className="truncate text-xs font-semibold text-slate-900 dark:text-white">{fullName}</p>
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">Administrator</p>
           </div>
           {/* Theme toggle */}
           <ThemeToggle
-            className="text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+            className="rounded-lg p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5 hover:text-slate-700 dark:hover:text-slate-200"
           />
         </div>
         {errorMsg && (
-          <p className="mt-2 text-xs text-red-600 dark:text-red-400 font-medium">{errorMsg}</p>
+          <p className="mt-2 text-[11px] text-red-600 dark:text-red-400 font-medium">{errorMsg}</p>
         )}
-        <div className="mt-3 flex gap-2">
+        <div className="mt-2.5 flex gap-2">
           <Link
             href="/admin/account"
-            className="flex-1 rounded-md px-2 py-1.5 text-center text-xs font-medium text-slate-600 dark:text-slate-300 transition-colors hover:bg-slate-100 dark:hover:bg-[#203552]"
+            className="flex-1 rounded-lg border border-slate-200/80 dark:border-white/10 px-2 py-1 text-center text-[11px] font-medium text-slate-700 dark:text-slate-300 transition-colors hover:bg-slate-50 dark:hover:bg-white/5"
           >
             Akun Saya
           </Link>
@@ -242,7 +283,7 @@ export default function AdminSidebar({ fullName }: AdminSidebarProps) {
             type="button"
             onClick={handleLogout}
             disabled={isLoggingOut}
-            className="flex-1 rounded-md px-2 py-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-50 transition-colors"
+            className="flex-1 rounded-lg border border-red-200 dark:border-red-900/40 px-2 py-1 text-center text-[11px] font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 disabled:opacity-50 transition-colors"
           >
             {isLoggingOut ? 'Keluar…' : 'Keluar'}
           </button>

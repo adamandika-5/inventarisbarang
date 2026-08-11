@@ -34,7 +34,8 @@ export default function LoginForm() {
 
       // Client-side validation (UX layer)
       const usernameError = validateUsername(state.username)
-      const passwordError = !state.password || state.password.length === 0 ? 'Kata sandi wajib diisi.' : null
+      const passwordError =
+        !state.password || state.password.length === 0 ? 'Kata sandi wajib diisi.' : null
 
       if (usernameError || passwordError) {
         setState((prev) => ({
@@ -100,17 +101,17 @@ export default function LoginForm() {
   )
 
   return (
-    <form onSubmit={handleSubmit} noValidate>
+    <form onSubmit={handleSubmit} noValidate className="w-full">
       {/* General error */}
       {state.errors.general && (
-        <div role="alert" className="alert-error mb-4">
+        <div role="alert" aria-live="assertive" className="alert-error mb-5 rounded-xl">
           {state.errors.general}
         </div>
       )}
 
       {/* Username field */}
-      <div className="mb-4">
-        <label htmlFor="username" className="label mb-1">
+      <div className="mb-3.5 sm:mb-4">
+        <label htmlFor="username" className="label mb-1.5 text-xs sm:text-sm">
           Username
         </label>
         <input
@@ -120,7 +121,8 @@ export default function LoginForm() {
           autoCapitalize="none"
           autoCorrect="off"
           spellCheck={false}
-          className={`input ${state.errors.username ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+          placeholder="Masukkan username"
+          className={`input h-12 rounded-xl border-slate-200 bg-slate-100 px-4 text-sm shadow-none sm:h-13 sm:text-[15px] dark:border-white/10 dark:bg-[#0b1424] ${state.errors.username ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
           value={state.username}
           onChange={(e) => {
             setState((prev) => ({
@@ -135,21 +137,26 @@ export default function LoginForm() {
           required
         />
         {state.errors.username && (
-          <p id="username-error" className="mt-1 text-xs text-red-600" role="alert">
+          <p
+            id="username-error"
+            className="mt-1.5 text-xs text-red-600 dark:text-red-400"
+            role="alert"
+          >
             {state.errors.username}
           </p>
         )}
       </div>
 
       {/* Password field */}
-      <div className="mb-6">
-        <label htmlFor="password" className="label mb-1">
+      <div className="mb-5 sm:mb-6">
+        <label htmlFor="password" className="label mb-1.5 text-xs sm:text-sm">
           Kata Sandi
         </label>
         <PasswordInput
           id="password"
           autoComplete="current-password"
-          className={`input ${state.errors.password ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+          placeholder="Masukkan kata sandi"
+          className={`input h-12 rounded-xl border-slate-200 bg-slate-100 px-4 text-sm shadow-none sm:h-13 sm:text-[15px] dark:border-white/10 dark:bg-[#0b1424] ${state.errors.password ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
           value={state.password}
           onChange={(e) => {
             setState((prev) => ({
@@ -164,7 +171,11 @@ export default function LoginForm() {
           required
         />
         {state.errors.password && (
-          <p id="password-error" className="mt-1 text-xs text-red-600" role="alert">
+          <p
+            id="password-error"
+            className="mt-1.5 text-xs text-red-600 dark:text-red-400"
+            role="alert"
+          >
             {state.errors.password}
           </p>
         )}
@@ -174,7 +185,7 @@ export default function LoginForm() {
       <button
         id="login-submit"
         type="submit"
-        className="btn-primary w-full"
+        className="btn-primary h-12 w-full rounded-xl text-sm font-semibold text-white shadow-sm sm:h-13 sm:text-base"
         disabled={state.isSubmitting}
         aria-busy={state.isSubmitting}
       >

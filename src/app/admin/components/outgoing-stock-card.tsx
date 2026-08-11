@@ -23,37 +23,52 @@ export default function OutgoingStockCard({
   const [period, setPeriod] = useState<'month' | 'year'>('month')
 
   const currentTotal = period === 'month' ? monthTotal : yearTotal
-  const displayValue = hasError ? '—' : `${formatNumber(currentTotal)} unit`
   const description =
     period === 'month'
       ? 'Total unit yang didistribusikan bulan ini'
       : 'Total unit yang didistribusikan tahun ini'
 
   return (
-    <section className="card flex flex-col justify-between min-w-0 p-5" aria-label="Barang Keluar">
+    <section
+      className="flex flex-col justify-between min-w-0 rounded-xl border border-slate-200/90 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-[#101D31] min-h-[150px]"
+      aria-label="Barang Keluar"
+    >
       <div>
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400">
+          <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Barang Keluar
           </p>
           <select
             aria-label="Periode barang keluar"
             value={period}
             onChange={(e) => setPeriod(e.target.value as 'month' | 'year')}
-            className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 shadow-sm focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-white/10 dark:bg-[#0B1220] dark:text-slate-200"
+            className="rounded-md border border-slate-200/90 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-700 shadow-none focus:border-amber-500 focus:outline-none focus:ring-1 focus:ring-amber-500 dark:border-white/10 dark:bg-[#0B1220] dark:text-slate-200 cursor-pointer"
           >
             <option value="month">Bulan Ini</option>
             <option value="year">Tahun Ini</option>
           </select>
         </div>
-        <div className="mt-2 flex items-start justify-between gap-3">
-          <p className="text-2xl font-extrabold text-amber-600 dark:text-amber-300 sm:text-3xl">
-            {displayValue}
-          </p>
-          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-300">
+
+        <div className="mt-2.5 flex items-start justify-between gap-3">
+          <div>
+            {hasError ? (
+              <p className="text-2xl font-bold text-slate-400 sm:text-3xl">—</p>
+            ) : (
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-2xl font-bold tracking-tight text-amber-600 dark:text-amber-400 sm:text-3xl">
+                  {formatNumber(currentTotal)}
+                </span>
+                <span className="text-xs sm:text-sm font-medium text-slate-500 dark:text-slate-400">
+                  unit
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">
             {/* PackageMinus Icon */}
             <svg
-              className="h-6 w-6"
+              className="h-5 w-5"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -69,7 +84,8 @@ export default function OutgoingStockCard({
           </div>
         </div>
       </div>
-      <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">
+
+      <p className="mt-3 text-xs text-slate-500 dark:text-slate-400 line-clamp-1">
         {description}
       </p>
     </section>

@@ -200,7 +200,7 @@ describe('Inventory Summary Report Excel Generation & Verification (Quantity-Onl
     expect(saldoAwal + mutasiMasuk - mutasiKeluar).toBe(saldoAkhir)
   })
 
-  it('builds a valid quantity-only "Riwayat Transaksi" Excel workbook (12 columns, no price columns)', async () => {
+  it('builds a valid quantity-only "Riwayat Transaksi" Excel workbook (11 columns, no price columns)', async () => {
     const mockQueryBuilder = {
       gte: () => mockQueryBuilder,
       lte: () => mockQueryBuilder,
@@ -287,10 +287,9 @@ describe('Inventory Summary Report Excel Generation & Verification (Quantity-Onl
       'Satuan',
       'Stok Setelah',
       'Petugas',
-      'Keterangan',
     ]
 
-    for (let c = 1; c <= 12; c++) {
+    for (let c = 1; c <= headersExpected.length; c++) {
       const headerCell = wsRiwayat.getRow(5).getCell(c)
       expect(headerCell.value).toBe(headersExpected[c - 1])
     }

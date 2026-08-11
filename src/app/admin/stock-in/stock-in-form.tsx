@@ -13,7 +13,7 @@
  * Price: Not collected. System is quantity-only since migration 011.
  */
 
-import { useState, useTransition, useCallback, useRef } from 'react'
+import { useState, useTransition, useMemo, useRef } from 'react'
 import { processStockIn } from './actions'
 import ItemSearchInput from '@/components/item-search-input'
 
@@ -42,15 +42,74 @@ interface StockInFormProps {
   preselectedItem: SelectedItem | null
 }
 
+export function getUnitsForItem(item: SelectedItem | null): UnitOption[] {
+  if (!item) return []
+  const baseUnit = item.base_unit
+  const units: UnitOption[] = []
+  const seenUnitIds = new Set<string>()
+
+  // Base unit with factor 1
+  if (baseUnit) {
+    seenUnitIds.add(baseUnit.id)
+    units.push({
+      id: baseUnit.id,
+      name: baseUnit.name,
+      symbol: baseUnit.symbol,
+      conversion_factor: 1,
+    })
+  }
+
+  // Alternate units
+  for (const itemUnit of item.item_units) {
+    const unit = itemUnit.units
+
+    if (!itemUnit.is_active || !unit || seenUnitIds.has(unit.id)) {
+      continue
+    }
+
+    seenUnitIds.add(unit.id)
+    units.push({
+      id: unit.id,
+      name: unit.name,
+      symbol: unit.symbol,
+      conversion_factor: Number(itemUnit.conversion_factor),
+    })
+  }
+
+  return units
+}
+
+export function formatUnitOptionLabel(
+  unit: UnitOption,
+  baseUnit: { name: string; symbol: string } | null,
+): string {
+  const baseName = baseUnit?.name || baseUnit?.symbol || 'satuan dasar'
+  if (unit.conversion_factor === 1) {
+    return `${unit.name} (satuan dasar)`
+  }
+  return `${unit.name} — isi ${unit.conversion_factor.toLocaleString('id-ID')} ${baseName.toLowerCase()}`
+}
+
+function getOnlyUnit(units: readonly UnitOption[]): UnitOption | null {
+  return units.length === 1 ? (units[0] ?? null) : null
+}
+
 // TODO(security): Consider adding CSRF token for this form
 export default function StockInForm({ preselectedItem }: StockInFormProps) {
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(preselectedItem)
-  const [selectedUnit, setSelectedUnit] = useState<UnitOption | null>(null)
+  const [selectedUnit, setSelectedUnit] = useState<UnitOption | null>(() => {
+    if (!preselectedItem) return null
+    const units = getUnitsForItem(preselectedItem)
+    return getOnlyUnit(units)
+  })
   const [quantity, setQuantity] = useState<string>('1')
   const [quantityError, setQuantityError] = useState<string | null>(null)
   const [showConfirm, setShowConfirm] = useState(false)
   const [isPending, startTransition] = useTransition()
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [message, setMessage] = useState<{
+    type: 'success' | 'error'
+    text: string
+  } | null>(null)
   const clientRequestIdRef = useRef(crypto.randomUUID())
   const formRef = useRef<HTMLFormElement>(null)
 
@@ -59,34 +118,15 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
     setTimeout(() => setMessage(null), 6000)
   }
 
-  const getAvailableUnits = useCallback((): UnitOption[] => {
-    if (!selectedItem) return []
-    const baseUnit = selectedItem.base_unit
-    const units: UnitOption[] = []
-
-    // Base unit with factor 1
-    if (baseUnit) {
-      units.push({ id: baseUnit.id, name: baseUnit.name, symbol: baseUnit.symbol, conversion_factor: 1 })
-    }
-
-    // Alternate units
-    selectedItem.item_units
-      .filter((iu) => iu.is_active && iu.units)
-      .forEach((iu) => {
-        units.push({
-          id: iu.units!.id,
-          name: iu.units!.name,
-          symbol: iu.units!.symbol,
-          conversion_factor: Number(iu.conversion_factor),
-        })
-      })
-
-    return units
+  const availableUnits = useMemo(() => {
+    return getUnitsForItem(selectedItem)
   }, [selectedItem])
 
   const handleItemSelect = (item: SelectedItem) => {
     setSelectedItem(item)
-    setSelectedUnit(null)
+    const units = getUnitsForItem(item)
+    // Auto-select if only 1 unit exists
+    setSelectedUnit(getOnlyUnit(units))
     setQuantity('1')
     setQuantityError(null)
     setShowConfirm(false)
@@ -94,7 +134,7 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
   }
 
   const handleUnitChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const units = getAvailableUnits()
+    const units = getUnitsForItem(selectedItem)
     const unit = units.find((u) => u.id === e.target.value)
     setSelectedUnit(unit ?? null)
     clientRequestIdRef.current = crypto.randomUUID() // reset idempotency key on unit change
@@ -103,6 +143,11 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
   const parsedQty = Number(quantity)
   const isQtyValid = quantity !== '' && Number.isInteger(parsedQty) && parsedQty >= 1
   const baseQuantity = selectedUnit && isQtyValid ? parsedQty * selectedUnit.conversion_factor : 0
+  const baseUnitLabel = (
+    selectedItem?.base_unit?.name ||
+    selectedItem?.base_unit?.symbol ||
+    ''
+  ).toLowerCase()
 
   const handleConfirm = () => {
     setShowConfirm(false)
@@ -134,7 +179,10 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
   return (
     <div className="mx-auto max-w-2xl">
       {message && (
-        <div role="alert" className={message.type === 'success' ? 'alert-success mb-4' : 'alert-error mb-4'}>
+        <div
+          role="alert"
+          className={message.type === 'success' ? 'alert-success mb-4' : 'alert-error mb-4'}
+        >
           {message.text}
         </div>
       )}
@@ -161,11 +209,21 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
         <div className="card space-y-5">
           {/* Item search */}
           <div>
-            <label className="label mb-1">Barang <span className="text-red-500">*</span></label>
+            <label className="label mb-1">
+              Barang <span className="text-red-500">*</span>
+            </label>
             <ItemSearchInput
               onSelect={handleItemSelect}
               placeholder="Cari nama, SKU, atau barcode…"
-              preselected={selectedItem ? { id: selectedItem.id, name: selectedItem.name, sku: selectedItem.sku } : null}
+              preselected={
+                selectedItem
+                  ? {
+                      id: selectedItem.id,
+                      name: selectedItem.name,
+                      sku: selectedItem.sku,
+                    }
+                  : null
+              }
             />
           </div>
 
@@ -173,12 +231,18 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
             <>
               <div className="rounded-md bg-blue-50 dark:bg-[#22D3EE]/10 border border-blue-200 dark:border-[#22D3EE]/30 p-3 text-sm text-blue-700 dark:text-[#22D3EE]">
                 <p className="font-medium">{selectedItem.name}</p>
-                <p className="text-xs">SKU: {selectedItem.sku} · Stok saat ini: {Number(selectedItem.current_stock).toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
+                <p className="text-xs">
+                  SKU: {selectedItem.sku} · Stok saat ini:{' '}
+                  {Number(selectedItem.current_stock).toLocaleString('id-ID')}{' '}
+                  {selectedItem.base_unit?.symbol}
+                </p>
               </div>
 
               {/* Unit selection */}
               <div>
-                <label htmlFor="stock-in-unit" className="label mb-1">Satuan <span className="text-red-500">*</span></label>
+                <label htmlFor="stock-in-unit" className="label mb-1">
+                  Satuan <span className="text-red-500">*</span>
+                </label>
                 <select
                   id="stock-in-unit"
                   name="unit_display"
@@ -188,17 +252,26 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
                   value={selectedUnit?.id ?? ''}
                 >
                   <option value="">Pilih Satuan</option>
-                  {getAvailableUnits().map((u) => (
+                  {availableUnits.map((u) => (
                     <option key={u.id} value={u.id}>
-                      {u.name} ({u.symbol}) — faktor: {u.conversion_factor}
+                      {formatUnitOptionLabel(u, selectedItem.base_unit)}
                     </option>
                   ))}
                 </select>
+                {selectedUnit && (
+                  <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                    {selectedUnit.conversion_factor === 1
+                      ? `1 ${selectedUnit.name.toLowerCase()} menambah 1 ${baseUnitLabel} pada stok.`
+                      : `1 ${selectedUnit.name.toLowerCase()} menambah ${selectedUnit.conversion_factor.toLocaleString('id-ID')} ${baseUnitLabel} pada stok.`}
+                  </p>
+                )}
               </div>
 
               {/* Quantity */}
               <div>
-                <label htmlFor="stock-in-qty" className="label mb-1">Jumlah <span className="text-red-500">*</span></label>
+                <label htmlFor="stock-in-qty" className="label mb-1">
+                  Jumlah <span className="text-red-500">*</span>
+                </label>
                 <input
                   id="stock-in-qty"
                   name="input_quantity"
@@ -236,9 +309,13 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
                   <p className="mt-1 text-xs text-red-600 dark:text-red-400">{quantityError}</p>
                 )}
                 {selectedUnit && isQtyValid && (
-                  <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                    = {baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}
-                  </p>
+                  <div className="mt-2.5 rounded-lg border border-blue-100 bg-blue-50/70 p-3 text-xs text-blue-900 dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-blue-200">
+                    <p className="font-medium">
+                      {parsedQty} {selectedUnit.name.toLowerCase()} ={' '}
+                      {baseQuantity.toLocaleString('id-ID')} {baseUnitLabel} yang ditambahkan ke
+                      stok
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -249,12 +326,17 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
                   <div className="mt-2 space-y-1 text-slate-600 dark:text-slate-300">
                     <div className="flex justify-between">
                       <span>Jumlah (satuan dasar)</span>
-                      <span>{baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</span>
+                      <span>
+                        {baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}
+                      </span>
                     </div>
                     <div className="flex justify-between">
                       <span>Perkiraan stok baru</span>
                       <span className="font-medium text-slate-900 dark:text-white">
-                        {(Number(selectedItem.current_stock) + baseQuantity).toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}
+                        {(Number(selectedItem.current_stock) + baseQuantity).toLocaleString(
+                          'id-ID',
+                        )}{' '}
+                        {selectedItem.base_unit?.symbol}
                       </span>
                     </div>
                   </div>
@@ -302,10 +384,27 @@ export default function StockInForm({ preselectedItem }: StockInFormProps) {
               Konfirmasi Barang Masuk
             </h2>
             <div className="mt-3 space-y-2 text-sm text-slate-700 dark:text-slate-300">
-              <p><span className="font-medium">Barang:</span> {selectedItem.name}</p>
-              <p><span className="font-medium">Jumlah:</span> {parsedQty} {selectedUnit.symbol} = {baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
-              <p><span className="font-medium">Stok sekarang:</span> {Number(selectedItem.current_stock).toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
-              <p><span className="font-medium">Stok setelah:</span> {(Number(selectedItem.current_stock) + baseQuantity).toLocaleString('id-ID')} {selectedItem.base_unit?.symbol}</p>
+              <p>
+                <span className="font-medium">Barang:</span> {selectedItem.name}
+              </p>
+              <p>
+                <span className="font-medium">Jumlah:</span> {parsedQty} {selectedUnit.name}{' '}
+                {selectedUnit.conversion_factor > 1 && (
+                  <span className="text-slate-500 dark:text-slate-400">
+                    ({baseQuantity.toLocaleString('id-ID')} {selectedItem.base_unit?.symbol})
+                  </span>
+                )}
+              </p>
+              <p>
+                <span className="font-medium">Stok sekarang:</span>{' '}
+                {Number(selectedItem.current_stock).toLocaleString('id-ID')}{' '}
+                {selectedItem.base_unit?.symbol}
+              </p>
+              <p>
+                <span className="font-medium">Stok setelah:</span>{' '}
+                {(Number(selectedItem.current_stock) + baseQuantity).toLocaleString('id-ID')}{' '}
+                {selectedItem.base_unit?.symbol}
+              </p>
             </div>
             <div className="mt-5 flex justify-end gap-3">
               <button

@@ -48,9 +48,15 @@
     --border-input: #d1d5db;
     /* gray-300 */
 
-    /* Brand */
-    --brand-600: #2563eb;
-    --brand-700: #1d4ed8;
+    /* Brand Primary Color (Brand Navy from Login Left Panel) */
+    --brand-primary: #1F5B87;
+    --brand-primary-hover: #194B70;
+    --brand-primary-active: #143E5E;
+    --brand-primary-foreground: #FFFFFF;
+    --brand-primary-focus: rgba(31, 91, 135, 0.28);
+
+    --brand-600: #1F5B87;
+    --brand-700: #194B70;
     --brand-50: #eff6ff;
     --brand-100: #dbeafe;
 
@@ -66,7 +72,7 @@
     --warning-text: #d97706;
     --info-bg: #eff6ff;
     --info-border: #bfdbfe;
-    --info-text: #2563eb;
+    --info-text: #1F5B87;
 
     /* Shadow */
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
@@ -105,9 +111,16 @@
     --border-muted: rgba(255, 255, 255, 0.08);
     --border-input: rgba(255, 255, 255, 0.20);
 
+    /* Brand Primary Color (Dark Mode - matching navy hue with clear contrast) */
+    --brand-primary: #1F5B87;
+    --brand-primary-hover: #2B72A7;
+    --brand-primary-active: #194B70;
+    --brand-primary-foreground: #FFFFFF;
+    --brand-primary-focus: rgba(43, 114, 167, 0.35);
+
     --brand-50: #083344;
     --brand-100: #0e7490;
-    --brand-600: #22d3ee;
+    --brand-600: #1F5B87;
 
     --success-bg: #052e16;
     --success-border: #166534;
@@ -120,7 +133,7 @@
     --warning-text: #fbbf24;
     --info-bg: #083344;
     --info-border: #0e7490;
-    --info-text: #22d3ee;
+    --info-text: #60a5fa;
 
     --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
     --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5), 0 2px 4px -2px rgb(0 0 0 / 0.4);
@@ -199,7 +212,8 @@
 
   /* Consistent focus for accessibility */
   :focus-visible {
-    @apply outline-2 outline-offset-2 outline-primary-600;
+    box-shadow: 0 0 0 3px var(--brand-primary-focus);
+    outline: none;
   }
 }
 
@@ -208,13 +222,29 @@
 
   /* ── Buttons ───────────────────────────────────────────────────────────────── */
   .btn {
-    @apply inline-flex items-center justify-center rounded-md font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-600 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex items-center justify-center rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-50;
     min-height: 2.75rem;
     padding: 0.625rem 1rem;
   }
 
   .btn-primary {
-    @apply btn bg-primary-600 text-white hover:bg-primary-700 active:bg-primary-800;
+    background-color: var(--brand-primary);
+    color: var(--brand-primary-foreground);
+    border: none;
+    @apply btn shadow-sm transition-colors;
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--brand-primary-hover);
+  }
+
+  .btn-primary:active:not(:disabled) {
+    background-color: var(--brand-primary-active);
+  }
+
+  .btn-primary:focus-visible {
+    box-shadow: 0 0 0 3px var(--brand-primary-focus);
+    outline: none;
   }
 
   .btn-secondary {

@@ -268,7 +268,7 @@ export default function ReportsClient({
       {/* Filter bar — Native GET Form */}
       <div className="card">
         <h2 className="mb-3 text-sm font-semibold text-slate-900 dark:text-slate-100">Filter Laporan</h2>
-        <form action="/admin/reports" method="GET" className="flex flex-wrap items-end gap-3">
+        <form action="/admin/reports" method="GET" className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
           <div>
             <label htmlFor="filter-from" className="label mb-1">
               Dari Tanggal
@@ -279,7 +279,7 @@ export default function ReportsClient({
               type="date"
               value={localFrom}
               onChange={(e) => setLocalFrom(e.target.value)}
-              className="input w-40"
+              className="input h-10 w-full"
               max={localTo}
             />
           </div>
@@ -293,7 +293,7 @@ export default function ReportsClient({
               type="date"
               value={localTo}
               onChange={(e) => setLocalTo(e.target.value)}
-              className="input w-40"
+              className="input h-10 w-full"
               min={localFrom}
             />
           </div>
@@ -306,7 +306,7 @@ export default function ReportsClient({
               name="type"
               value={localType || 'ALL'}
               onChange={(e) => setLocalType(e.target.value)}
-              className="input w-44"
+              className="input h-10 w-full"
             >
               <option value="ALL">Semua Jenis</option>
               <option value="INITIAL">Stok Pembukaan</option>
@@ -316,25 +316,22 @@ export default function ReportsClient({
               <option value="REVERSAL">Koreksi</option>
             </select>
           </div>
-          {localType === 'INITIAL' && (
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Stok yang pertama kali dicatat ketika barang mulai digunakan dalam sistem.
-            </p>
-          )}
-          <div className="flex gap-2">
+          <div>
             <button
               type="submit"
               id="btn-apply-filter"
-              className="btn-primary"
+              className="btn-primary h-10 w-full flex items-center justify-center"
             >
               Terapkan
             </button>
+          </div>
+          <div>
             <button
               type="button"
               id="btn-reset-filter"
               onClick={handleReset}
               disabled={!hasActiveFilter}
-              className="btn-secondary flex items-center justify-center px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="btn-secondary h-10 w-full flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Reset
             </button>
@@ -386,39 +383,39 @@ export default function ReportsClient({
 
       {/* Transactions table */}
       <div className="card">
-        <div className="mb-4 flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-base font-semibold text-slate-900 dark:text-slate-100">
             Riwayat Transaksi
             <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
               ({totalCount.toLocaleString('id-ID')} total)
             </span>
           </h2>
-          <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-auto">
+          <div className="flex flex-col sm:flex-row gap-2.5 w-full sm:w-auto">
             <button
               type="button"
               id="btn-export-inventory-summary"
               onClick={handleExportInventorySummary}
               disabled={downloadingSummary}
-              className="btn-primary flex items-center justify-center w-full whitespace-nowrap text-sm font-semibold shadow-sm xl:w-auto disabled:opacity-50"
-              title="Unduh Laporan Rincian Barang Persediaan dalam format Excel (Gambar 2)"
+              className="btn-primary flex items-center justify-center w-full sm:w-auto px-3.5 py-2 text-xs sm:text-sm font-medium whitespace-nowrap shadow-sm disabled:opacity-50"
+              title="Unduh Rincian Persediaan (Excel)"
             >
               <svg className="mr-1.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              {downloadingSummary ? 'Mengunduh Rincian...' : 'Export Rincian Persediaan (Excel)'}
+              {downloadingSummary ? 'Mengunduh...' : 'Unduh Persediaan (Excel)'}
             </button>
             <button
               type="button"
               id="btn-export-transactions-detail"
               onClick={handleExportTransactionsDetail}
               disabled={downloadingDetail}
-              className="btn-secondary flex items-center justify-center w-full whitespace-nowrap text-sm font-semibold xl:w-auto disabled:opacity-50"
-              title="Unduh Detail Riwayat Transaksi dalam format Excel"
+              className="btn-secondary flex items-center justify-center w-full sm:w-auto px-3.5 py-2 text-xs sm:text-sm font-medium whitespace-nowrap disabled:opacity-50"
+              title="Unduh Transaksi (Excel)"
             >
               <svg className="mr-1.5 h-4 w-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
               </svg>
-              {downloadingDetail ? 'Mengunduh Riwayat...' : 'Export Riwayat Transaksi (Excel)'}
+              {downloadingDetail ? 'Mengunduh...' : 'Unduh Transaksi (Excel)'}
             </button>
           </div>
         </div>
@@ -430,17 +427,16 @@ export default function ReportsClient({
         ) : (
           <div>
             <div className="w-full overflow-x-auto">
-              <table className="table min-w-[1100px]">
+              <table className="table min-w-[900px] w-full">
                 <thead>
                   <tr>
-                    <th className="min-w-[180px] whitespace-nowrap">No. Transaksi</th>
-                    <th>Tanggal (WIB)</th>
-                    <th>Jenis</th>
-                    <th>Barang</th>
-                    <th className="text-right">Jumlah</th>
-                    <th className="text-right">Stok Sesudah</th>
-                    <th>Oleh</th>
-                    <th>Alasan</th>
+                    <th className="min-w-[170px] whitespace-nowrap">NO. TRANSAKSI</th>
+                    <th className="whitespace-nowrap">TANGGAL (WIB)</th>
+                    <th>JENIS</th>
+                    <th>BARANG</th>
+                    <th className="text-right">JUMLAH</th>
+                    <th className="text-right whitespace-nowrap">STOK SESUDAH</th>
+                    <th>OLEH</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -481,9 +477,6 @@ export default function ReportsClient({
                       </td>
                       <td className="text-sm text-slate-600 dark:text-slate-300">
                         {tx.profiles?.full_name ?? tx.profiles?.username ?? '—'}
-                      </td>
-                      <td className="max-w-[180px] truncate text-xs text-slate-500 dark:text-slate-400" title={tx.reason ?? undefined}>
-                        {tx.reason ?? '—'}
                       </td>
                     </tr>
                   ))}
@@ -593,31 +586,23 @@ function SummaryCard({
   color: 'green' | 'red' | 'blue' | 'orange' | 'gray'
   icon: string
 }) {
-  const cardBorderClasses = {
-    green: 'border-green-200 dark:border-emerald-800/50',
-    red: 'border-red-200 dark:border-red-800/50',
-    blue: 'border-blue-200 dark:border-[#22D3EE]/40',
-    orange: 'border-amber-200 dark:border-amber-800/50',
-    gray: 'border-slate-200 dark:border-white/10',
-  }
-
   const iconClasses = {
-    green: 'text-green-600 dark:text-emerald-400',
+    green: 'text-emerald-600 dark:text-emerald-400',
     red: 'text-red-600 dark:text-red-400',
     blue: 'text-blue-600 dark:text-[#22D3EE]',
     orange: 'text-amber-600 dark:text-amber-400',
-    gray: 'text-slate-500 dark:text-slate-400',
+    gray: 'text-slate-400 dark:text-slate-500',
   }
 
   return (
-    <div className={`rounded-lg border bg-white dark:bg-[#17263D] p-4 shadow-sm ${cardBorderClasses[color]}`}>
+    <div className="rounded-xl border border-slate-200/90 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-[#17263D]">
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{label}</span>
-        <span className={`text-lg font-bold ${iconClasses[color]}`} aria-hidden="true">
+        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">{label}</span>
+        <span className={`text-base font-bold ${iconClasses[color]}`} aria-hidden="true">
           {icon}
         </span>
       </div>
-      <p className="mt-2 text-3xl font-extrabold tabular-nums text-slate-900 dark:text-white">{value}</p>
+      <p className="mt-2 text-2xl font-bold tabular-nums text-slate-900 dark:text-white sm:text-3xl">{value}</p>
     </div>
   )
 }

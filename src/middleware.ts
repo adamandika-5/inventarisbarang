@@ -42,7 +42,9 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
+        setAll(
+          cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>,
+        ) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = NextResponse.next({ request })
           cookiesToSet.forEach(({ name, value, options }) =>
@@ -54,7 +56,9 @@ export async function middleware(request: NextRequest) {
   )
 
   // Fast path for login page when no auth cookie is present
-  const hasAuthCookie = request.cookies.getAll().some((c) => c.name.includes('sb-') || c.name.includes('token'))
+  const hasAuthCookie = request.cookies
+    .getAll()
+    .some((c) => c.name.includes('sb-') || c.name.includes('token'))
 
   if (pathname === '/login' && !hasAuthCookie) {
     return supabaseResponse
@@ -117,9 +121,10 @@ export const config = {
      * - _next/image (image optimization)
      * - favicon.ico
      * - manifest.json
+     * - /branding (login branding assets)
      * - /icons (PWA icons)
      * - /api/auth (auth endpoints)
      */
-    '/((?!_next/static|_next/image|favicon.ico|manifest.json|icons|sw.js).*)',
+    '/((?!_next/static|_next/image|favicon.ico|manifest.json|branding|icons|illustrations|sw.js).*)',
   ],
 }

@@ -85,7 +85,7 @@ export default function StockOutList({
           type="search"
           placeholder="Cari nomor transaksi…"
           defaultValue={search}
-          className="input max-w-sm"
+          className="input w-full max-w-[480px]"
           onKeyDown={(e) => {
             if (e.key === 'Enter') runSearch((e.target as HTMLInputElement).value)
           }}
@@ -108,24 +108,24 @@ export default function StockOutList({
         </div>
       ) : (
         <div className="table-container">
-          <table className="table" aria-label="Riwayat barang keluar">
+          <table className="table w-full" aria-label="Riwayat barang keluar">
             <thead>
               <tr>
-                <th scope="col" className="whitespace-nowrap">No. Transaksi</th>
-                <th scope="col">Barang</th>
-                <th scope="col">Jumlah</th>
-                <th scope="col">Stok Sebelum</th>
-                <th scope="col">Stok Sesudah</th>
-                <th scope="col">Oleh</th>
-                <th scope="col" className="whitespace-nowrap">Waktu</th>
-                <th scope="col">Status</th>
+                <th scope="col" className="whitespace-nowrap">NO. TRANSAKSI</th>
+                <th scope="col">BARANG</th>
+                <th scope="col" className="text-right">JUMLAH</th>
+                <th scope="col" className="text-right">STOK SEBELUM</th>
+                <th scope="col" className="text-right">STOK SESUDAH</th>
+                <th scope="col">OLEH</th>
+                <th scope="col" className="whitespace-nowrap">WAKTU</th>
+                <th scope="col" className="text-center">STATUS</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
               {transactions.map((tx) => (
-                <tr key={tx.id} className={tx.is_reversed ? 'opacity-60' : ''}>
-                  <td className="whitespace-nowrap">
-                    <code className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-mono text-slate-700 dark:bg-[#0B1220] dark:text-[#22D3EE] dark:border dark:border-white/10 whitespace-nowrap">
+                <tr key={tx.id} className={`transition-colors hover:bg-slate-50/70 dark:hover:bg-white/[0.02] ${tx.is_reversed ? 'opacity-60' : ''}`}>
+                  <td className="whitespace-nowrap font-mono text-xs">
+                    <code className="code-chip inline-block whitespace-nowrap">
                       {tx.transaction_number}
                     </code>
                   </td>
@@ -133,22 +133,26 @@ export default function StockOutList({
                     <span className="font-medium text-slate-900 dark:text-white">{tx.items?.name ?? '—'}</span>
                     <div className="text-xs text-slate-400 dark:text-slate-400">{tx.items?.sku}</div>
                   </td>
-                  <td className="text-sm">
-                    {Number(tx.input_quantity).toLocaleString('id-ID')} {tx.units?.symbol}
+                  <td className="text-right tabular-nums text-sm font-medium text-red-600 dark:text-red-400">
+                    -{Number(tx.input_quantity).toLocaleString('id-ID')} {tx.units?.symbol}
                   </td>
-                  <td className="text-sm">{Number(tx.stock_before).toLocaleString('id-ID')}</td>
-                  <td className="text-sm">{Number(tx.stock_after).toLocaleString('id-ID')}</td>
+                  <td className="text-right tabular-nums text-sm text-slate-600 dark:text-slate-300">
+                    {Number(tx.stock_before).toLocaleString('id-ID')}
+                  </td>
+                  <td className="text-right tabular-nums text-sm font-semibold text-slate-900 dark:text-slate-100">
+                    {Number(tx.stock_after).toLocaleString('id-ID')}
+                  </td>
                   <td className="text-sm text-slate-600 dark:text-slate-300">
                     {tx.profiles?.full_name ?? tx.profiles?.username ?? '—'}
                   </td>
                   <td className="whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                     {dtf.format(new Date(tx.transaction_at))}
                   </td>
-                  <td>
+                  <td className="text-center">
                     {tx.is_reversed ? (
-                      <span className="badge-nonaktif text-xs">Dibatalkan</span>
+                      <span className="badge-nonaktif text-xs inline-block">Dibatalkan</span>
                     ) : (
-                      <span className="badge-aman text-xs">Valid</span>
+                      <span className="badge-aman text-xs inline-block">Valid</span>
                     )}
                   </td>
                 </tr>

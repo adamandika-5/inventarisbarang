@@ -370,7 +370,7 @@ describe('Transaction History Keyset & Workbook Comprehensive Test Suite', () =>
     expect(worksheet).toBeDefined()
 
     // HEAD Regression Check 2: Total columns & header row structure & labels (Row 5)
-    expect(worksheet?.columns.length).toBe(12)
+    expect(worksheet?.columns.length).toBe(11)
     const headerRow = worksheet?.getRow(5)
     expect(headerRow).toBeDefined()
     expect(headerRow?.number).toBe(5)
@@ -387,7 +387,6 @@ describe('Transaction History Keyset & Workbook Comprehensive Test Suite', () =>
       'Satuan',
       'Stok Setelah',
       'Petugas',
-      'Keterangan',
     ]
 
     expectedHeaders.forEach((expectedLabel, idx) => {

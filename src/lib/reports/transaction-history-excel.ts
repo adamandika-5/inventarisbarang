@@ -279,7 +279,7 @@ export async function buildTransactionHistoryWorkbook(
     fitToHeight: 0,
   }
 
-  // Column Widths (12 columns: A to L)
+  // Column Widths (11 columns: A to K)
   worksheet.columns = [
     { width: 6 },  // A: No.
     { width: 22 }, // B: Tanggal dan Waktu (WIB)
@@ -292,7 +292,6 @@ export async function buildTransactionHistoryWorkbook(
     { width: 12 }, // I: Satuan
     { width: 14 }, // J: Stok Setelah
     { width: 20 }, // K: Petugas
-    { width: 35 }, // L: Keterangan
   ]
 
   const thinBorder = {
@@ -304,22 +303,22 @@ export async function buildTransactionHistoryWorkbook(
 
   const qtyFormat = '#,##0;(#,##0);0'
 
-  // Header Block (Rows 1-3 merged A1:L3)
-  worksheet.mergeCells('A1:L1')
+  // Header Block (Rows 1-3 merged A1:K3)
+  worksheet.mergeCells('A1:K1')
   const r1 = worksheet.getRow(1)
   r1.height = 24
   r1.getCell(1).value = instNameDisplay
   r1.getCell(1).font = { name: 'Calibri', size: 14, bold: true, color: { argb: 'FF0F172A' } }
   r1.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
 
-  worksheet.mergeCells('A2:L2')
+  worksheet.mergeCells('A2:K2')
   const r2 = worksheet.getRow(2)
   r2.height = 20
   r2.getCell(1).value = headerTextDisplay
   r2.getCell(1).font = { name: 'Calibri', size: 12, bold: true, color: { argb: 'FF334155' } }
   r2.getCell(1).alignment = { horizontal: 'center', vertical: 'middle' }
 
-  worksheet.mergeCells('A3:L3')
+  worksheet.mergeCells('A3:K3')
   const r3 = worksheet.getRow(3)
   r3.height = 18
   r3.getCell(1).value = `Periode: ${dateRangeDisplay}   |   Jenis: ${typeFilterLabel}   |   Diunduh: ${generatedAtWib}`
@@ -330,7 +329,7 @@ export async function buildTransactionHistoryWorkbook(
   const r4 = worksheet.getRow(4)
   r4.height = 8
 
-  // Column Headers Row 5 (A5:L5)
+  // Column Headers Row 5 (A5:K5)
   const headerRow = worksheet.getRow(5)
   headerRow.height = 28
   const headers = [
@@ -345,7 +344,6 @@ export async function buildTransactionHistoryWorkbook(
     'Satuan',
     'Stok Setelah',
     'Petugas',
-    'Keterangan',
   ]
 
   headers.forEach((title, idx) => {
@@ -357,8 +355,8 @@ export async function buildTransactionHistoryWorkbook(
     cell.border = thinBorder
   })
 
-  // Set AutoFilter on A5:L5
-  worksheet.autoFilter = 'A5:L5'
+  // Set AutoFilter on A5:K5
+  worksheet.autoFilter = 'A5:K5'
 
   // Populate Data Rows (Starting Row 6)
   let rowIdx = 6
@@ -398,17 +396,6 @@ export async function buildTransactionHistoryWorkbook(
 
     const stokSetelah = Number(t.stock_after ?? 0)
 
-    // Build Notes / Keterangan with Reversal Reference if present
-    let notesDisplay = sanitizeUserString(t.reason)
-    if (t.transaction_type === 'REVERSAL' && t.original_transaction_id) {
-      const refNo = refTxNoMap[t.original_transaction_id]
-      if (refNo) {
-        notesDisplay = notesDisplay
-          ? `${notesDisplay} (Koreksi atas transaksi ${refNo})`
-          : `Koreksi atas transaksi ${refNo}`
-      }
-    }
-
     // Cell Assignments
     row.getCell(1).value = itemNo++
     row.getCell(2).value = dtWib
@@ -434,11 +421,8 @@ export async function buildTransactionHistoryWorkbook(
     // Col 11: Petugas
     row.getCell(11).value = profileDisplay
 
-    // Col 12: Keterangan
-    row.getCell(12).value = notesDisplay
-
     // Alignments and borders for data row
-    for (let c = 1; c <= 12; c++) {
+    for (let c = 1; c <= 11; c++) {
       const cell = row.getCell(c)
       cell.border = thinBorder
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: rowBg } }

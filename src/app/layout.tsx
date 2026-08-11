@@ -7,18 +7,21 @@ import { ServiceWorkerRegistration } from '@/components/service-worker-registrat
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
 export const metadata: Metadata = {
-  title: 'InventarisBarang',
-  description: 'Sistem Pengelolaan Persediaan Alat Tulis Kantor',
+  title: 'Inventaris Barang BPS Kota Mojokerto',
+  description: 'Sistem Pengelolaan Inventaris Barang BPS Kota Mojokerto',
   manifest: '/manifest.json',
-  applicationName: 'InventarisBarang',
-  keywords: ['inventaris', 'persediaan', 'alat tulis kantor', 'ATK'],
+  applicationName: 'Inventaris Barang BPS Kota Mojokerto',
+  keywords: ['inventaris', 'barang', 'stok', 'BPS', 'Mojokerto', 'persediaan'],
   robots: {
     index: false, // Internal app, no public indexing
     follow: false,
   },
   icons: {
-    icon: '/icons/icon-192.png',
-    apple: '/icons/icon-512.png',
+    icon: [
+      { url: '/branding/favicon-logo-sistem-v2-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/branding/favicon-logo-sistem-v2-48.png', sizes: '48x48', type: 'image/png' },
+    ],
+    apple: '/icons/logo-sistem-v2-512.png',
   },
 }
 
@@ -26,7 +29,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#2563eb',
+  themeColor: '#1e3a5c',
 }
 
 export default function RootLayout({

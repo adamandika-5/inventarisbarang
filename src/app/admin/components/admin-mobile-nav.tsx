@@ -85,12 +85,12 @@ export default function AdminMobileNav({ fullName }: AdminMobileNavProps) {
     <>
       {/* Mobile top bar */}
       <header className="flex h-14 items-center justify-between border-b border-slate-200 dark:border-white/10 bg-white dark:bg-[#101D31] px-4 shadow-sm lg:hidden">
-        <div className="flex items-center">
+        <div className="flex items-center gap-2.5">
           <button
             type="button"
             id="btn-mobile-menu"
             onClick={() => setIsOpen(true)}
-            className="rounded-md p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#203552] hover:text-slate-900 dark:hover:text-white"
+            className="rounded-md p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-[#203552] hover:text-slate-900 dark:hover:text-white"
             aria-label="Buka menu"
             aria-expanded={isOpen}
             aria-controls="mobile-menu"
@@ -99,7 +99,19 @@ export default function AdminMobileNav({ fullName }: AdminMobileNavProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
-          <span className="ml-3 text-lg font-bold text-slate-900 dark:text-white">Inventaris Barang</span>
+          <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/branding/logo-sistem-v2.png"
+              alt="Logo Inventaris Barang"
+              className="h-6 w-6 object-contain shrink-0"
+              onError={(e) => {
+                const target = e.currentTarget
+                target.style.display = 'none'
+              }}
+            />
+            <span className="text-base font-bold text-slate-900 dark:text-white">Inventaris Barang</span>
+          </div>
         </div>
         <ThemeToggle className="text-slate-600 dark:text-slate-300" />
       </header>
@@ -121,7 +133,19 @@ export default function AdminMobileNav({ fullName }: AdminMobileNavProps) {
         aria-label="Menu mobile admin"
       >
         <div className="flex h-14 items-center justify-between border-b border-slate-200 dark:border-white/10 px-4">
-          <span className="text-lg font-bold text-slate-900 dark:text-white">Menu Admin</span>
+          <div className="flex items-center gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/branding/logo-sistem-v2.png"
+              alt="Logo Inventaris Barang"
+              className="h-6 w-6 object-contain shrink-0"
+              onError={(e) => {
+                const target = e.currentTarget
+                target.style.display = 'none'
+              }}
+            />
+            <span className="text-base font-bold text-slate-900 dark:text-white">Menu Admin</span>
+          </div>
           <button
             type="button"
             onClick={() => setIsOpen(false)}

@@ -39,7 +39,7 @@ export default async function StockOutPage({
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="mb-4">
         <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Riwayat Barang Keluar</h1>
         <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{count ?? 0} transaksi keluar</p>
       </div>

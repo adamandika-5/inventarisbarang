@@ -89,18 +89,18 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
         </div>
       )}
 
-      <div className="mb-4 flex items-center justify-between">
+      <div className="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <input
           id="search-user"
           type="search"
           placeholder="Cari nama atau username…"
           defaultValue={search}
-          className="input max-w-sm"
+          className="input w-full sm:w-80 max-w-sm"
           onKeyDown={(e) => {
             if (e.key === 'Enter') updateParam('search', (e.target as HTMLInputElement).value)
           }}
         />
-        <Link href="/admin/users/new" id="btn-tambah-pegawai" className="btn-primary">
+        <Link href="/admin/users/new" id="btn-tambah-pegawai" className="btn-primary shrink-0 self-start sm:self-auto">
           + Tambah Pegawai
         </Link>
       </div>
@@ -111,16 +111,16 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
         </div>
       ) : (
         <div className="table-container">
-          <table className="table" aria-label="Daftar pengguna">
+          <table className="table w-full" aria-label="Daftar pengguna">
             <thead>
               <tr>
-                <th scope="col">Nama Lengkap</th>
-                <th scope="col">Username</th>
-                <th scope="col">Peran</th>
-                <th scope="col">Status</th>
-                <th scope="col">Password</th>
-                <th scope="col">Terdaftar</th>
-                <th scope="col" className="text-right">Aksi</th>
+                <th scope="col">NAMA LENGKAP</th>
+                <th scope="col">USERNAME</th>
+                <th scope="col">PERAN</th>
+                <th scope="col">STATUS AKUN</th>
+                <th scope="col">STATUS PASSWORD</th>
+                <th scope="col" className="whitespace-nowrap">TERDAFTAR</th>
+                <th scope="col" className="text-center w-60">TINDAKAN</th>
               </tr>
             </thead>
             <tbody>
@@ -131,7 +131,7 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
                     <code className="code-chip">{user.username}</code>
                   </td>
                   <td>
-                    <span className={user.role === 'ADMIN' ? 'text-sm font-medium text-blue-700 dark:text-blue-400' : 'text-sm text-slate-600 dark:text-slate-300'}>
+                    <span className={user.role === 'ADMIN' ? 'text-sm font-semibold text-blue-700 dark:text-blue-400' : 'text-sm text-slate-600 dark:text-slate-300'}>
                       {user.role === 'ADMIN' ? 'Admin' : 'Pegawai'}
                     </span>
                   </td>
@@ -144,21 +144,25 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
                   </td>
                   <td>
                     {user.must_change_password ? (
-                      <span className="badge-hampir-habis text-xs">Harus ganti</span>
+                      <span className="badge-hampir-habis text-xs whitespace-nowrap">Harus ganti</span>
                     ) : (
                       <span className="text-xs text-slate-400 dark:text-slate-500">Normal</span>
                     )}
                   </td>
-                  <td className="text-sm text-slate-500 dark:text-slate-400">
+                  <td className="whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                     {dtf.format(new Date(user.created_at))}
                   </td>
-                  <td className="text-right">
-                    {user.role !== 'ADMIN' && (
-                      <div className="flex justify-end gap-2">
+                  <td className="text-center whitespace-nowrap">
+                    {user.role !== 'ADMIN' ? (
+                      <div className="inline-flex items-center justify-center gap-2">
                         <button
                           id={`btn-toggle-user-${user.id}`}
                           type="button"
-                          className={user.is_active ? 'btn-ghost text-sm text-red-600' : 'btn-ghost text-sm text-green-600'}
+                          className={
+                            user.is_active
+                              ? 'min-h-[36px] h-[36px] px-2.5 py-1 text-xs font-medium whitespace-nowrap inline-flex items-center justify-center rounded-md border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors'
+                              : 'min-h-[36px] h-[36px] px-2.5 py-1 text-xs font-medium whitespace-nowrap inline-flex items-center justify-center rounded-md border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors'
+                          }
                           onClick={() => handleToggle(user.id, user.is_active, user.full_name)}
                           disabled={isPending}
                         >
@@ -167,13 +171,15 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
                         <button
                           id={`btn-reset-password-${user.id}`}
                           type="button"
-                          className="btn-secondary text-sm"
+                          className="btn-secondary min-h-[36px] h-[36px] px-2.5 py-1 text-xs font-medium whitespace-nowrap inline-flex items-center justify-center"
                           onClick={() => handleResetPassword(user.id, user.full_name)}
                           disabled={isPending}
                         >
                           Reset Password
                         </button>
                       </div>
+                    ) : (
+                      <span className="text-xs text-slate-400 dark:text-slate-500 italic">Akun saat ini</span>
                     )}
                   </td>
                 </tr>

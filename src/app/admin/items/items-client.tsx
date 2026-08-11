@@ -200,7 +200,7 @@ export default function ItemsClient({
                 <th scope="col">Stok</th>
                 <th scope="col">Status Stok</th>
                 <th scope="col">Status</th>
-                <th scope="col" className="text-right">Aksi</th>
+                <th scope="col" className="text-center w-52">TINDAKAN</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 dark:divide-slate-700">
@@ -236,12 +236,12 @@ export default function ItemsClient({
                         <span className="text-sm text-gray-500 dark:text-slate-400">Nonaktif</span>
                       )}
                     </td>
-                    <td className="text-right">
-                      <div className="flex justify-end gap-2">
+                    <td className="text-center whitespace-nowrap">
+                      <div className="inline-flex items-center justify-center gap-2">
                         <Link
                           href={`/admin/items/${item.id}`}
                           id={`btn-detail-item-${item.id}`}
-                          className="btn-secondary text-sm"
+                          className="btn-secondary min-h-[38px] h-[38px] px-3 py-1.5 text-xs font-medium whitespace-nowrap inline-flex items-center justify-center"
                         >
                           Detail
                         </Link>
@@ -250,7 +250,7 @@ export default function ItemsClient({
                             <button
                               type="button"
                               id={`btn-nonaktifkan-item-${item.id}`}
-                              className="rounded-md border border-red-300 bg-red-50 px-2.5 py-1 text-sm font-medium text-red-700 shadow-sm hover:bg-red-100 dark:border-red-800 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-950/70 transition-colors"
+                              className="min-h-[38px] h-[38px] px-3 py-1.5 text-xs font-medium whitespace-nowrap inline-flex items-center justify-center rounded-md border border-red-200 dark:border-red-900/40 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
                               onClick={() => {
                                 setDeactivateTarget(item)
                                 setModalError(null)
@@ -262,7 +262,7 @@ export default function ItemsClient({
                             <button
                               type="button"
                               id={`btn-aktifkan-item-${item.id}`}
-                              className="rounded-md border border-emerald-300 bg-white px-2.5 py-1 text-sm font-medium text-emerald-700 shadow-sm hover:bg-emerald-50 dark:border-emerald-700/80 dark:bg-slate-800 dark:text-emerald-300 dark:hover:bg-emerald-950/40 transition-colors"
+                              className="min-h-[38px] h-[38px] px-3 py-1.5 text-xs font-medium whitespace-nowrap inline-flex items-center justify-center rounded-md border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors"
                               onClick={() => handleActivate(item)}
                               disabled={isPending}
                             >

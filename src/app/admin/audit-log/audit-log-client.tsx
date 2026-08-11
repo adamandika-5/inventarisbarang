@@ -113,15 +113,15 @@ export default function AuditLogClient({
     <div>
       {/* Filter bar */}
       <div className="mb-4">
-        <div className="flex gap-3">
+        <div className="flex items-center gap-3">
           <select
             id="filter-action"
             value={actionFilter}
-            className="input w-56"
+            className="input h-10 w-56"
             onChange={(e) => setActionFilter(e.target.value)}
-            aria-label="Filter jenis aksi"
+            aria-label="Filter jenis aktivitas"
           >
-            <option value="">Semua Aksi</option>
+            <option value="">Semua Aktivitas</option>
             {Object.entries(ACTION_LABELS)
               .filter(([key]) => key !== 'EXCEL_IMPORT')
               .map(([key, label]) => (
@@ -130,7 +130,7 @@ export default function AuditLogClient({
           </select>
           <button
             type="button"
-            className="btn-secondary"
+            className="btn-secondary h-10 flex items-center justify-center px-4"
             onClick={resetFilters}
             aria-label="Reset filter"
           >
@@ -149,20 +149,19 @@ export default function AuditLogClient({
         <div className="card py-12 text-center text-slate-500 dark:text-slate-400">
           <p className="text-base font-medium">
             {actionFilter
-              ? `Belum ada riwayat untuk aksi ${ACTION_LABELS[actionFilter] ?? actionFilter}.`
+              ? `Belum ada riwayat untuk aktivitas ${ACTION_LABELS[actionFilter] ?? actionFilter}.`
               : 'Belum ada riwayat audit.'}
           </p>
         </div>
       ) : (
         <div className="table-container">
-          <table className="table" aria-label="Audit log">
+          <table className="table w-full" aria-label="Audit log">
             <thead>
               <tr>
-                <th scope="col" className="whitespace-nowrap">Waktu</th>
-                <th scope="col">Aksi</th>
-                <th scope="col">Entitas</th>
-                <th scope="col">Oleh</th>
-                <th scope="col">Alasan</th>
+                <th scope="col" className="w-[23%] min-w-[180px] whitespace-nowrap">WAKTU</th>
+                <th scope="col" className="w-[30%]">AKTIVITAS</th>
+                <th scope="col" className="w-[22%]">ENTITAS</th>
+                <th scope="col">OLEH</th>
               </tr>
             </thead>
             <tbody>
@@ -182,7 +181,6 @@ export default function AuditLogClient({
                   <td className="text-sm text-slate-900 dark:text-slate-100">
                     {log.profiles?.full_name ?? log.profiles?.username ?? 'Sistem'}
                   </td>
-                  <td className="text-sm text-slate-500 dark:text-slate-400">{log.reason ?? '—'}</td>
                 </tr>
               ))}
             </tbody>
