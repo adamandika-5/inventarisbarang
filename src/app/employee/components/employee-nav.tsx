@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import ThemeToggle from '@/components/theme-toggle'
 
@@ -73,8 +74,23 @@ export default function EmployeeNav({ fullName }: EmployeeNavProps) {
         <div className="flex h-16 items-center justify-between">
           {/* Brand */}
           <div className="flex items-center">
-            <Link href="/employee" className="text-lg font-bold text-gray-900 dark:text-white hover:text-blue-600 dark:hover:text-[#22D3EE]">
-              Inventaris Barang
+            <Link
+              href="/employee"
+              className="flex items-center gap-2.5 hover:opacity-90 transition-opacity"
+              aria-label="Inventaris Barang"
+            >
+              <Image
+                src="/branding/logo-sistem-v2.png"
+                alt="Inventaris Barang"
+                width={32}
+                height={32}
+                className="h-8 w-8 object-contain shrink-0"
+                priority
+                unoptimized
+              />
+              <span className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight">
+                Inventaris Barang
+              </span>
             </Link>
           </div>
 

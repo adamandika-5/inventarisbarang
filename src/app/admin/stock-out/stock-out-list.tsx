@@ -113,9 +113,9 @@ export default function StockOutList({
               <tr>
                 <th scope="col" className="whitespace-nowrap">NO. TRANSAKSI</th>
                 <th scope="col">BARANG</th>
-                <th scope="col" className="text-right">JUMLAH</th>
-                <th scope="col" className="text-right">STOK SEBELUM</th>
-                <th scope="col" className="text-right">STOK SESUDAH</th>
+                <th scope="col" className="text-right whitespace-nowrap min-w-[110px]">JUMLAH</th>
+                <th scope="col" className="text-right whitespace-nowrap">STOK SEBELUM</th>
+                <th scope="col" className="text-right whitespace-nowrap">STOK SESUDAH</th>
                 <th scope="col">OLEH</th>
                 <th scope="col" className="whitespace-nowrap">WAKTU</th>
                 <th scope="col" className="text-center">STATUS</th>
@@ -133,8 +133,11 @@ export default function StockOutList({
                     <span className="font-medium text-slate-900 dark:text-white">{tx.items?.name ?? '—'}</span>
                     <div className="text-xs text-slate-400 dark:text-slate-400">{tx.items?.sku}</div>
                   </td>
-                  <td className="text-right tabular-nums text-sm font-medium text-red-600 dark:text-red-400">
-                    -{Number(tx.input_quantity).toLocaleString('id-ID')} {tx.units?.symbol}
+                  <td className="text-right tabular-nums text-sm font-medium text-rose-600 dark:text-rose-400 whitespace-nowrap min-w-[110px]">
+                    <span className="inline-flex items-baseline justify-end gap-1 whitespace-nowrap">
+                      <span>-{Number(tx.input_quantity).toLocaleString('id-ID')}</span>
+                      <span className="text-xs font-normal text-slate-500 dark:text-slate-400">{tx.units?.symbol}</span>
+                    </span>
                   </td>
                   <td className="text-right tabular-nums text-sm text-slate-600 dark:text-slate-300">
                     {Number(tx.stock_before).toLocaleString('id-ID')}

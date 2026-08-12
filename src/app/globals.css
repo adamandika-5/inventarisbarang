@@ -24,10 +24,10 @@
     /* slate-100 — hover */
     --bg-muted: #f3f4f6;
     /* gray-100 */
-    --bg-code: #f3f4f6;
+    --bg-code: #f1f5f9;
     /* chip SKU */
-    --text-code: #1e40af;
-    /* blue-800 — teks chip SKU */
+    --text-code: #334155;
+    /* slate-700 — teks chip SKU netral */
 
     /* Text */
     --text-primary: #111827;
@@ -105,7 +105,7 @@
     --text-muted: #8494ab;
     --text-faint: #5a6b82;
     --text-label: #f8fafc;
-    --text-code: #22d3ee;
+    --text-code: #cbd5e1;
 
     --border-default: rgba(255, 255, 255, 0.12);
     --border-muted: rgba(255, 255, 255, 0.08);

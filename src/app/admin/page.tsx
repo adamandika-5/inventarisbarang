@@ -284,9 +284,7 @@ export default async function AdminDashboardPage({
       : monthlySeries.flatMap((p) => [p.incoming, p.outgoing])
 
   const peakDataValue = Math.max(0, ...currentPeriodPoints)
-  const maxChartValue = peakDataValue > 0
-    ? Math.max(peakDataValue + 1, Math.ceil(peakDataValue * 1.2))
-    : 1
+  const maxChartValue = peakDataValue > 0 ? peakDataValue : 1
   const totalActivityTransactions = activityRows.filter((r) => {
     const v = Number(r.quantity_delta)
     return Number.isFinite(v) && v !== 0
@@ -440,7 +438,7 @@ export default async function AdminDashboardPage({
           <div className="flex flex-col gap-3 border-b border-slate-100 pb-4 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
-                {periodLabel.title}
+                Aktivitas Stok
               </h2>
               <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                 {hasChartData
@@ -527,9 +525,9 @@ export default async function AdminDashboardPage({
               <div>
                 <div className="grid grid-cols-7 gap-2 sm:gap-3">
                   {dailySeries.map((point) => {
-                    const plotH = 190
-                    const inH = point.incoming > 0 ? Math.max(22, Math.round((point.incoming / maxChartValue) * plotH)) : 0
-                    const outH = point.outgoing > 0 ? Math.max(22, Math.round((point.outgoing / maxChartValue) * plotH)) : 0
+                    const plotH = 180
+                    const inH = point.incoming > 0 ? Math.max(18, Math.round((point.incoming / maxChartValue) * plotH)) : 0
+                    const outH = point.outgoing > 0 ? Math.max(18, Math.round((point.outgoing / maxChartValue) * plotH)) : 0
                     const [weekday, ...dateParts] = point.label.split(' ')
                     const dateStr = dateParts.join(' ')
                     return (
@@ -579,9 +577,9 @@ export default async function AdminDashboardPage({
               <div>
                 <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${weeklySeries.length}, minmax(0, 1fr))` }}>
                   {weeklySeries.map((point) => {
-                    const plotH = 190
-                    const inH = point.incoming > 0 ? Math.max(22, Math.round((point.incoming / maxChartValue) * plotH)) : 0
-                    const outH = point.outgoing > 0 ? Math.max(22, Math.round((point.outgoing / maxChartValue) * plotH)) : 0
+                    const plotH = 180
+                    const inH = point.incoming > 0 ? Math.max(18, Math.round((point.incoming / maxChartValue) * plotH)) : 0
+                    const outH = point.outgoing > 0 ? Math.max(18, Math.round((point.outgoing / maxChartValue) * plotH)) : 0
                     return (
                       <div key={point.weekNumber} className="min-w-0 text-center">
                         <div className="relative flex h-[190px] sm:h-[210px] items-end justify-center gap-1.5 border-b border-[#E2E8F0] dark:border-[#334155] pb-0.5">
@@ -623,9 +621,9 @@ export default async function AdminDashboardPage({
               <div className="overflow-x-auto">
                 <div className="grid min-w-[480px] grid-cols-12 gap-1.5">
                   {monthlySeries.map((point) => {
-                    const plotH = 190
-                    const inH = point.incoming > 0 ? Math.max(16, Math.round((point.incoming / maxChartValue) * plotH)) : 0
-                    const outH = point.outgoing > 0 ? Math.max(16, Math.round((point.outgoing / maxChartValue) * plotH)) : 0
+                    const plotH = 180
+                    const inH = point.incoming > 0 ? Math.max(14, Math.round((point.incoming / maxChartValue) * plotH)) : 0
+                    const outH = point.outgoing > 0 ? Math.max(14, Math.round((point.outgoing / maxChartValue) * plotH)) : 0
                     return (
                       <div key={point.monthIndex} className="min-w-0 text-center">
                         <div className="relative flex h-[190px] sm:h-[210px] items-end justify-center gap-0.5 border-b border-[#E2E8F0] dark:border-[#334155] pb-0.5">

@@ -28,7 +28,6 @@ export default function StockOutClient() {
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null)
   const [selectedUnit, setSelectedUnit] = useState<UnitOption | null>(null)
   const [quantity, setQuantity] = useState<string>('1')
-  const [reason, setReason] = useState('')
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
@@ -109,7 +108,6 @@ export default function StockOutClient() {
       formData.set('item_id', selectedItem.id)
       formData.set('unit_id', selectedUnit.id)
       formData.set('input_quantity', String(num))
-      if (reason.trim()) formData.set('reason', reason.trim())
 
       const result = await processEmployeeStockOut(formData)
 
@@ -121,7 +119,6 @@ export default function StockOutClient() {
         setSelectedItem(null)
         setSelectedUnit(null)
         setQuantity('1')
-        setReason('')
       } else {
         setMessage({ type: 'error', text: result.error ?? 'Gagal mencatat pengeluaran barang.' })
       }
@@ -210,21 +207,6 @@ export default function StockOutClient() {
           Stok tidak mencukupi. Butuh {baseQuantityNeeded} {selectedItem.base_unit?.symbol}, tersedia {selectedItem.current_stock}.
         </div>
       )}
-
-      <div>
-        <label htmlFor="stockout-reason" className="label mb-1">
-          Catatan / Keperluan (Opsional)
-        </label>
-        <textarea
-          id="stockout-reason"
-          rows={3}
-          maxLength={500}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder="Contoh: Pengambilan untuk pemakaian internal divisi"
-          className="input"
-        />
-      </div>
 
       <div className="flex justify-end gap-3 pt-2">
         <button

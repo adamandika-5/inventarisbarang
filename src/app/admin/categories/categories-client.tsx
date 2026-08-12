@@ -95,14 +95,22 @@ export default function CategoriesClient({ initialCategories }: CategoriesClient
       )}
 
       {/* Header actions */}
-      <div className="mb-4 flex items-center justify-between">
-        <p className="text-sm text-slate-600 dark:text-slate-300">
-          {activeCount} aktif &middot; {inactiveCount} nonaktif
-        </p>
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
+          <span className="inline-flex items-center gap-1.5 font-medium">
+            <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
+            {activeCount} Aktif
+          </span>
+          <span className="text-slate-300 dark:text-slate-600">&middot;</span>
+          <span className="inline-flex items-center gap-1.5 font-medium text-slate-500 dark:text-slate-400">
+            <span className="h-2 w-2 rounded-full bg-slate-300 dark:bg-slate-600"></span>
+            {inactiveCount} Nonaktif
+          </span>
+        </div>
         <button
           id="btn-tambah-kategori"
           type="button"
-          className="btn-primary"
+          className="btn-primary h-9 min-h-[36px] px-3.5 text-xs sm:text-sm font-medium whitespace-nowrap inline-flex items-center justify-center gap-1.5"
           onClick={() => {
             setShowAddForm(!showAddForm)
             setEditingId(null)
@@ -151,107 +159,111 @@ export default function CategoriesClient({ initialCategories }: CategoriesClient
 
       {/* Category table */}
       {categories.length === 0 ? (
-        <div className="card py-12 text-center text-slate-500 dark:text-slate-400">
+        <div className="rounded-xl border border-slate-200/90 bg-white p-12 text-center text-slate-500 dark:border-white/10 dark:bg-[#101D31] dark:text-slate-400">
           <p className="text-lg font-medium">Belum ada kategori</p>
           <p className="mt-1 text-sm">Klik &ldquo;Tambah Kategori&rdquo; untuk memulai.</p>
         </div>
       ) : (
-        <div className="table-container">
-          <table className="table" aria-label="Daftar kategori">
-            <thead>
-              <tr>
-                <th scope="col">Nama Kategori</th>
-                <th scope="col">Status</th>
-                <th scope="col">Dibuat</th>
-                <th scope="col" className="text-right">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((category) => (
-                <tr key={category.id}>
-                  <td>
-                    {editingId === category.id ? (
-                      <form
-                        ref={editFormRef}
-                        action={(fd) => handleUpdate(category.id, fd)}
-                        className="flex items-center gap-2"
-                      >
-                        <input
-                          id={`edit-name-${category.id}`}
-                          name="name"
-                          type="text"
-                          defaultValue={category.name}
-                          required
-                          maxLength={100}
-                          className="input max-w-xs"
-                          autoFocus
-                        />
-                        <button
-                          type="submit"
-                          className="btn-primary text-sm"
-                          disabled={isPending}
-                        >
-                          {isPending ? '…' : 'Simpan'}
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-secondary text-sm"
-                          onClick={() => setEditingId(null)}
-                          disabled={isPending}
-                        >
-                          Batal
-                        </button>
-                      </form>
-                    ) : (
-                      <span className="font-medium text-slate-900 dark:text-slate-100">{category.name}</span>
-                    )}
-                  </td>
-                  <td>
-                    {category.is_active ? (
-                      <span className="badge-aman">Aktif</span>
-                    ) : (
-                      <span className="badge-nonaktif">Nonaktif</span>
-                    )}
-                  </td>
-                  <td className="text-sm text-slate-500 dark:text-slate-400">
-                    {new Intl.DateTimeFormat('id-ID', {
-                      dateStyle: 'medium',
-                      timeZone: 'Asia/Jakarta',
-                    }).format(new Date(category.created_at))}
-                  </td>
-                  <td className="text-right">
-                    <div className="flex justify-end gap-2">
-                      {editingId !== category.id && (
-                        <button
-                          id={`btn-edit-kategori-${category.id}`}
-                          type="button"
-                          className="btn-secondary text-sm"
-                          onClick={() => {
-                            setEditingId(category.id)
-                            setShowAddForm(false)
-                          }}
-                          disabled={isPending}
-                        >
-                          Edit
-                        </button>
-                      )}
-                      <button
-                        id={`btn-toggle-kategori-${category.id}`}
-                        type="button"
-                        className={category.is_active ? 'btn-ghost text-sm text-red-600' : 'btn-ghost text-sm text-green-600'}
-                        onClick={() => handleToggle(category.id, category.is_active)}
-                        disabled={isPending}
-                      >
-                        {category.is_active ? 'Nonaktifkan' : 'Aktifkan'}
-                      </button>
-                    </div>
-                  </td>
+        <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm dark:border-white/10 dark:bg-[#101D31]">
+          <div className="w-full overflow-x-auto">
+            <table className="w-full text-left text-sm" aria-label="Daftar kategori">
+              <thead>
+                <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-white/10 dark:bg-[#101D31]">
+                  <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nama Kategori</th>
+                  <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Status</th>
+                  <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Dibuat</th>
+                  <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">AKSI</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                {categories.map((category) => (
+                  <tr key={category.id} className="transition-colors hover:bg-slate-50/80 dark:hover:bg-white/[0.03]">
+                    <td className="px-4 py-3">
+                      {editingId === category.id ? (
+                        <form
+                          ref={editFormRef}
+                          action={(fd) => handleUpdate(category.id, fd)}
+                          className="flex items-center gap-2"
+                        >
+                          <input
+                            id={`edit-name-${category.id}`}
+                            name="name"
+                            type="text"
+                            defaultValue={category.name}
+                            required
+                            maxLength={100}
+                            className="input max-w-xs"
+                            autoFocus
+                          />
+                          <button
+                            type="submit"
+                            className="btn-primary text-sm"
+                            disabled={isPending}
+                          >
+                            {isPending ? '…' : 'Simpan'}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn-secondary text-sm"
+                            onClick={() => setEditingId(null)}
+                            disabled={isPending}
+                          >
+                            Batal
+                          </button>
+                        </form>
+                      ) : (
+                        <span className="font-medium text-slate-900 dark:text-slate-100">{category.name}</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {category.is_active ? (
+                        <span className="badge-aman">Aktif</span>
+                      ) : (
+                        <span className="badge-nonaktif">Nonaktif</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">
+                      {new Intl.DateTimeFormat('id-ID', {
+                        dateStyle: 'medium',
+                        timeZone: 'Asia/Jakarta',
+                      }).format(new Date(category.created_at))}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="inline-flex items-center justify-end gap-2">
+                        {editingId !== category.id && (
+                          <button
+                            id={`btn-edit-kategori-${category.id}`}
+                            type="button"
+                            className="btn-secondary h-[34px] min-h-[34px] px-3 text-xs font-medium whitespace-nowrap"
+                            onClick={() => {
+                              setEditingId(category.id)
+                              setShowAddForm(false)
+                            }}
+                            disabled={isPending}
+                          >
+                            Edit
+                          </button>
+                        )}
+                        <button
+                          id={`btn-toggle-kategori-${category.id}`}
+                          type="button"
+                          className={
+                            category.is_active
+                              ? 'h-[34px] min-h-[34px] px-3 text-xs font-medium whitespace-nowrap rounded-md border border-red-200 text-red-600 dark:border-red-900/40 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors'
+                              : 'h-[34px] min-h-[34px] px-3 text-xs font-medium whitespace-nowrap rounded-md border border-emerald-200 text-emerald-600 dark:border-emerald-800 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 transition-colors'
+                          }
+                          onClick={() => handleToggle(category.id, category.is_active)}
+                          disabled={isPending}
+                        >
+                          {category.is_active ? 'Nonaktifkan' : 'Aktifkan'}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

@@ -28,16 +28,16 @@ export default async function UnitsPage() {
       </div>
 
       {/* Tab navigation */}
-      <nav className="tab-nav mb-6" aria-label="Tab kategori dan satuan">
+      <nav className="mb-6 inline-flex w-full sm:w-auto rounded-lg bg-slate-100 dark:bg-slate-800/80 p-1 border border-slate-200/80 dark:border-white/10" aria-label="Tab kategori dan satuan">
         <Link
           href="/admin/categories"
-          className="tab-nav-item"
+          className="flex-1 sm:flex-initial px-5 py-1.5 text-center text-sm font-medium rounded-md text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-all"
         >
           Kategori
         </Link>
         <Link
           href="/admin/units"
-          className="tab-nav-item active"
+          className="flex-1 sm:flex-initial px-5 py-1.5 text-center text-sm font-semibold rounded-md bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white transition-all"
           aria-current="page"
         >
           Satuan

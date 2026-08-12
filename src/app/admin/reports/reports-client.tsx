@@ -100,12 +100,12 @@ const TYPE_LABELS: Record<TransactionType, string> = {
 }
 
 const TYPE_CLASSES: Record<TransactionType, string> = {
-  IN: 'bg-green-100 text-green-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-700/50',
-  OUT: 'bg-red-100 text-red-800 dark:bg-red-950/60 dark:text-red-300 dark:border dark:border-red-700/50',
-  INITIAL: 'bg-blue-100 text-blue-800 dark:bg-[#22D3EE]/20 dark:text-[#22D3EE] dark:border dark:border-[#22D3EE]/30',
-  ADJUSTMENT_IN: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border dark:border-emerald-700/50',
-  ADJUSTMENT_OUT: 'bg-orange-100 text-orange-800 dark:bg-amber-950/60 dark:text-amber-300 dark:border dark:border-amber-700/50',
-  REVERSAL: 'bg-slate-100 text-slate-700 dark:bg-[#0B1220] dark:text-slate-300 dark:border dark:border-white/10',
+  IN: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40',
+  OUT: 'bg-rose-50 text-rose-700 border border-rose-200/80 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/40',
+  INITIAL: 'bg-slate-100 text-slate-700 border border-slate-200 dark:bg-slate-800/60 dark:text-slate-200 dark:border-white/10',
+  ADJUSTMENT_IN: 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40',
+  ADJUSTMENT_OUT: 'bg-amber-50 text-amber-800 border border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/40',
+  REVERSAL: 'bg-slate-100 text-slate-600 border border-slate-200 dark:bg-slate-800/40 dark:text-slate-300 dark:border-white/10',
 }
 
 // ── WIB formatting ─────────────────────────────────────────────────────────────────
