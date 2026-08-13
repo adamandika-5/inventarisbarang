@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import { themeScript } from '@/lib/theme-script'
 import { ServiceWorkerRegistration } from '@/components/service-worker-registration'
+import { PwaStartupScreen } from '@/components/pwa-startup-screen'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 
@@ -23,13 +24,18 @@ export const metadata: Metadata = {
     ],
     apple: '/icons/logo-sistem-v2-512.png',
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'InvBarang',
+  },
 }
 
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-  themeColor: '#1e3a5c',
+  themeColor: '#101d31',
 }
 
 export default function RootLayout({
@@ -47,6 +53,7 @@ export default function RootLayout({
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className={`${inter.variable} font-sans antialiased`}>
+        <PwaStartupScreen />
         {children}
         <ServiceWorkerRegistration />
       </body>

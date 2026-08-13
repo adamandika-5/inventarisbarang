@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { PasswordInput } from '@/components/password-input'
+import { BrandedLoader } from '@/components/branded-loader'
 import { validateUsername } from '@/lib/validation/auth'
 
 interface FormState {
@@ -14,6 +15,7 @@ interface FormState {
     general?: string
   }
   isSubmitting: boolean
+  loadingMessage: string
 }
 
 export default function LoginForm() {
@@ -23,6 +25,7 @@ export default function LoginForm() {
     password: '',
     errors: {},
     isSubmitting: false,
+    loadingMessage: '',
   })
 
   const handleSubmit = useCallback(
@@ -48,7 +51,12 @@ export default function LoginForm() {
         return
       }
 
-      setState((prev) => ({ ...prev, isSubmitting: true, errors: {} }))
+      setState((prev) => ({
+        ...prev,
+        isSubmitting: true,
+        loadingMessage: 'Memverifikasi akun Anda...',
+        errors: {},
+      }))
 
       try {
         const response = await fetch('/api/auth/login', {
@@ -71,6 +79,7 @@ export default function LoginForm() {
           setState((prev) => ({
             ...prev,
             isSubmitting: false,
+            loadingMessage: '',
             errors: {
               general: generalError,
             },
@@ -79,6 +88,11 @@ export default function LoginForm() {
         }
 
         const data = (await response.json()) as { role?: string; mustChangePassword?: boolean }
+
+        setState((prev) => ({
+          ...prev,
+          loadingMessage: 'Menyiapkan halaman akun Anda...',
+        }))
 
         // Redirect based on must_change_password flag
         if (data.mustChangePassword) {
@@ -96,6 +110,7 @@ export default function LoginForm() {
         setState((prev) => ({
           ...prev,
           isSubmitting: false,
+          loadingMessage: '',
           errors: {
             general: 'Terjadi kesalahan. Periksa koneksi internet Anda dan coba lagi.',
           },
@@ -106,122 +121,137 @@ export default function LoginForm() {
   )
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="w-full">
-      {/* General error */}
-      {state.errors.general && (
-        <div role="alert" aria-live="assertive" className="alert-error mb-5 rounded-xl">
-          {state.errors.general}
+    <>
+      {state.isSubmitting && (
+        <div
+          className="login-loading-overlay"
+          role="status"
+          aria-live="polite"
+          aria-label={state.loadingMessage}
+        >
+          <div className="login-loading-overlay__panel">
+            <BrandedLoader title="Sedang Masuk" message={state.loadingMessage} compact />
+          </div>
         </div>
       )}
 
-      {/* Username field */}
-      <div className="mb-3.5 sm:mb-4">
-        <label htmlFor="username" className="label mb-1.5 text-xs sm:text-sm">
-          Username
-        </label>
-        <input
-          id="username"
-          type="text"
-          autoComplete="username"
-          autoCapitalize="none"
-          autoCorrect="off"
-          spellCheck={false}
-          placeholder="Masukkan username"
-          className={`input h-12 rounded-xl border-slate-200 bg-slate-100 px-4 text-sm shadow-none sm:h-13 sm:text-[15px] dark:border-white/10 dark:bg-[#0b1424] ${state.errors.username ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-          value={state.username}
-          onChange={(e) => {
-            setState((prev) => ({
-              ...prev,
-              username: e.target.value,
-              errors: { ...prev.errors, username: undefined },
-            }))
-          }}
-          disabled={state.isSubmitting}
-          aria-describedby={state.errors.username ? 'username-error' : undefined}
-          aria-invalid={!!state.errors.username}
-          required
-        />
-        {state.errors.username && (
-          <p
-            id="username-error"
-            className="mt-1.5 text-xs text-red-600 dark:text-red-400"
-            role="alert"
-          >
-            {state.errors.username}
-          </p>
+      <form onSubmit={handleSubmit} noValidate className="w-full" aria-busy={state.isSubmitting}>
+        {/* General error */}
+        {state.errors.general && (
+          <div role="alert" aria-live="assertive" className="alert-error mb-5 rounded-xl">
+            {state.errors.general}
+          </div>
         )}
-      </div>
 
-      {/* Password field */}
-      <div className="mb-5 sm:mb-6">
-        <label htmlFor="password" className="label mb-1.5 text-xs sm:text-sm">
-          Kata Sandi
-        </label>
-        <PasswordInput
-          id="password"
-          autoComplete="current-password"
-          placeholder="Masukkan kata sandi"
-          className={`input h-12 rounded-xl border-slate-200 bg-slate-100 px-4 text-sm shadow-none sm:h-13 sm:text-[15px] dark:border-white/10 dark:bg-[#0b1424] ${state.errors.password ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
-          value={state.password}
-          onChange={(e) => {
-            setState((prev) => ({
-              ...prev,
-              password: e.target.value,
-              errors: { ...prev.errors, password: undefined },
-            }))
-          }}
-          disabled={state.isSubmitting}
-          aria-describedby={state.errors.password ? 'password-error' : undefined}
-          aria-invalid={!!state.errors.password}
-          required
-        />
-        {state.errors.password && (
-          <p
-            id="password-error"
-            className="mt-1.5 text-xs text-red-600 dark:text-red-400"
-            role="alert"
-          >
-            {state.errors.password}
-          </p>
-        )}
-      </div>
-
-      {/* Submit button — disabled immediately after click to prevent double-submit */}
-      <button
-        id="login-submit"
-        type="submit"
-        className="btn-primary h-12 w-full rounded-xl text-sm font-semibold text-white shadow-sm sm:h-13 sm:text-base"
-        disabled={state.isSubmitting}
-        aria-busy={state.isSubmitting}
-      >
-        {state.isSubmitting ? (
-          <span className="flex items-center gap-2">
-            <svg
-              className="h-4 w-4 animate-spin"
-              viewBox="0 0 24 24"
-              fill="none"
-              aria-hidden="true"
+        {/* Username field */}
+        <div className="mb-3.5 sm:mb-4">
+          <label htmlFor="username" className="label mb-1.5 text-xs sm:text-sm">
+            Username
+          </label>
+          <input
+            id="username"
+            type="text"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            placeholder="Masukkan username"
+            className={`input h-12 rounded-xl border-slate-200 bg-slate-100 px-4 text-sm shadow-none sm:h-13 sm:text-[15px] dark:border-white/10 dark:bg-[#0b1424] ${state.errors.username ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+            value={state.username}
+            onChange={(e) => {
+              setState((prev) => ({
+                ...prev,
+                username: e.target.value,
+                errors: { ...prev.errors, username: undefined },
+              }))
+            }}
+            disabled={state.isSubmitting}
+            aria-describedby={state.errors.username ? 'username-error' : undefined}
+            aria-invalid={!!state.errors.username}
+            required
+          />
+          {state.errors.username && (
+            <p
+              id="username-error"
+              className="mt-1.5 text-xs text-red-600 dark:text-red-400"
+              role="alert"
             >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
-              />
-            </svg>
-            Memproses...
-          </span>
-        ) : (
-          'Masuk'
-        )}
-      </button>
-    </form>
+              {state.errors.username}
+            </p>
+          )}
+        </div>
+
+        {/* Password field */}
+        <div className="mb-5 sm:mb-6">
+          <label htmlFor="password" className="label mb-1.5 text-xs sm:text-sm">
+            Kata Sandi
+          </label>
+          <PasswordInput
+            id="password"
+            autoComplete="current-password"
+            placeholder="Masukkan kata sandi"
+            className={`input h-12 rounded-xl border-slate-200 bg-slate-100 px-4 text-sm shadow-none sm:h-13 sm:text-[15px] dark:border-white/10 dark:bg-[#0b1424] ${state.errors.password ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''}`}
+            value={state.password}
+            onChange={(e) => {
+              setState((prev) => ({
+                ...prev,
+                password: e.target.value,
+                errors: { ...prev.errors, password: undefined },
+              }))
+            }}
+            disabled={state.isSubmitting}
+            aria-describedby={state.errors.password ? 'password-error' : undefined}
+            aria-invalid={!!state.errors.password}
+            required
+          />
+          {state.errors.password && (
+            <p
+              id="password-error"
+              className="mt-1.5 text-xs text-red-600 dark:text-red-400"
+              role="alert"
+            >
+              {state.errors.password}
+            </p>
+          )}
+        </div>
+
+        {/* Submit button — disabled immediately after click to prevent double-submit */}
+        <button
+          id="login-submit"
+          type="submit"
+          className="btn-primary h-12 w-full rounded-xl text-sm font-semibold text-white shadow-sm sm:h-13 sm:text-base"
+          disabled={state.isSubmitting}
+          aria-busy={state.isSubmitting}
+        >
+          {state.isSubmitting ? (
+            <span className="flex items-center gap-2">
+              <svg
+                className="h-4 w-4 animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+              Memproses...
+            </span>
+          ) : (
+            'Masuk'
+          )}
+        </button>
+      </form>
+    </>
   )
 }

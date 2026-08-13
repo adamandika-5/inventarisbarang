@@ -14,7 +14,9 @@
  * - When offline: show clear indicator, disable transaction buttons
  */
 
-const CACHE_NAME = 'inventarisbarang-shell-v1'
+// Bump the cache whenever manifest/icons change so installed PWAs do not keep
+// an outdated splash screen.
+const CACHE_NAME = 'inventarisbarang-shell-v2'
 
 // Only cache the application shell and static assets
 const SHELL_ASSETS = [
