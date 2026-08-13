@@ -107,15 +107,28 @@ export default function StockOutList({
           )}
         </div>
       ) : (
-        <div className="table-container">
-          <table className="table w-full" aria-label="Riwayat barang keluar">
+        <div className="table-container border-t-0 border-slate-200/80 dark:border-white/10">
+          <table
+            className="table min-w-[1120px] table-fixed divide-y-0"
+            aria-label="Riwayat barang keluar"
+          >
+            <colgroup>
+              <col className="w-[16%]" />
+              <col className="w-[13%]" />
+              <col className="w-[9%]" />
+              <col className="w-[12%]" />
+              <col className="w-[12%]" />
+              <col className="w-[11%]" />
+              <col className="w-[17%]" />
+              <col className="w-[10%]" />
+            </colgroup>
             <thead>
               <tr>
                 <th scope="col" className="whitespace-nowrap">NO. TRANSAKSI</th>
                 <th scope="col">BARANG</th>
-                <th scope="col" className="text-right whitespace-nowrap min-w-[110px]">JUMLAH</th>
-                <th scope="col" className="text-right whitespace-nowrap">STOK SEBELUM</th>
-                <th scope="col" className="text-right whitespace-nowrap">STOK SESUDAH</th>
+                <th scope="col" className="whitespace-nowrap text-right">JUMLAH</th>
+                <th scope="col" className="whitespace-nowrap text-center">STOK SEBELUM</th>
+                <th scope="col" className="whitespace-nowrap text-center">STOK SESUDAH</th>
                 <th scope="col">OLEH</th>
                 <th scope="col" className="whitespace-nowrap">WAKTU</th>
                 <th scope="col" className="text-center">STATUS</th>
@@ -133,16 +146,16 @@ export default function StockOutList({
                     <span className="font-medium text-slate-900 dark:text-white">{tx.items?.name ?? '—'}</span>
                     <div className="text-xs text-slate-400 dark:text-slate-400">{tx.items?.sku}</div>
                   </td>
-                  <td className="text-right tabular-nums text-sm font-medium text-rose-600 dark:text-rose-400 whitespace-nowrap min-w-[110px]">
-                    <span className="inline-flex items-baseline justify-end gap-1 whitespace-nowrap">
+                  <td className="whitespace-nowrap text-right text-sm font-medium tabular-nums text-rose-600 dark:text-rose-400">
+                    <span className="flex items-baseline justify-end gap-1 whitespace-nowrap">
                       <span>-{Number(tx.input_quantity).toLocaleString('id-ID')}</span>
                       <span className="text-xs font-normal text-slate-500 dark:text-slate-400">{tx.units?.symbol}</span>
                     </span>
                   </td>
-                  <td className="text-right tabular-nums text-sm text-slate-600 dark:text-slate-300">
+                  <td className="text-center tabular-nums text-sm text-slate-600 dark:text-slate-300">
                     {Number(tx.stock_before).toLocaleString('id-ID')}
                   </td>
-                  <td className="text-right tabular-nums text-sm font-semibold text-slate-900 dark:text-slate-100">
+                  <td className="text-center tabular-nums text-sm font-semibold text-slate-900 dark:text-slate-100">
                     {Number(tx.stock_after).toLocaleString('id-ID')}
                   </td>
                   <td className="text-sm text-slate-600 dark:text-slate-300">
@@ -151,11 +164,11 @@ export default function StockOutList({
                   <td className="whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">
                     {dtf.format(new Date(tx.transaction_at))}
                   </td>
-                  <td className="text-center">
+                  <td className="whitespace-nowrap text-center">
                     {tx.is_reversed ? (
-                      <span className="badge-nonaktif text-xs inline-block">Dibatalkan</span>
+                      <span className="badge-nonaktif inline-flex whitespace-nowrap text-xs">Dibatalkan</span>
                     ) : (
-                      <span className="badge-aman text-xs inline-block">Valid</span>
+                      <span className="badge-aman inline-flex whitespace-nowrap text-xs">Valid</span>
                     )}
                   </td>
                 </tr>

@@ -77,7 +77,7 @@ export default function UnitsClient({ initialUnits }: UnitsClientProps) {
         </div>
       )}
 
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-300">
           <span className="inline-flex items-center gap-1.5 font-medium">
             <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
@@ -148,13 +148,19 @@ export default function UnitsClient({ initialUnits }: UnitsClientProps) {
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm dark:border-white/10 dark:bg-[#101D31]">
           <div className="w-full overflow-x-auto">
-            <table className="w-full text-left text-sm" aria-label="Daftar satuan">
+            <table className="w-full min-w-[720px] table-fixed text-left text-sm" aria-label="Daftar satuan">
+              <colgroup>
+                <col className="w-[31%]" />
+                <col className="w-[15%]" />
+                <col className="w-[18%]" />
+                <col className="w-[36%]" />
+              </colgroup>
               <thead>
                 <tr className="border-b border-slate-200 bg-slate-50/80 dark:border-white/10 dark:bg-[#101D31]">
                   <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Nama Satuan</th>
                   <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Simbol</th>
                   <th scope="col" className="px-4 py-3 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">Status</th>
-                  <th scope="col" className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">AKSI</th>
+                  <th scope="col" className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">TINDAKAN</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -215,8 +221,8 @@ export default function UnitsClient({ initialUnits }: UnitsClientProps) {
                         <span className="badge-nonaktif">Nonaktif</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-right">
-                      <div className="inline-flex items-center justify-end gap-2">
+                    <td className="px-4 py-3 text-center">
+                      <div className="inline-flex items-center justify-center gap-2">
                         {editingId !== unit.id && (
                           <button
                             id={`btn-edit-satuan-${unit.id}`}

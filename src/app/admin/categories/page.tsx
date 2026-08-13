@@ -26,13 +26,13 @@ export default async function CategoriesPage() {
   return (
     <div>
       {/* Page header */}
-      <div className="mb-6">
+      <div className="mb-5">
         <h1 className="text-2xl font-bold">Kategori &amp; Satuan</h1>
         <p className="mt-1 text-sm">Kelola kategori barang dan satuan yang digunakan</p>
       </div>
 
       {/* Tab navigation between categories and units */}
-      <nav className="mb-6 inline-flex w-full sm:w-auto rounded-lg bg-slate-100 dark:bg-slate-800/80 p-1 border border-slate-200/80 dark:border-white/10" aria-label="Tab kategori dan satuan">
+      <nav className="mb-4 inline-flex w-full rounded-lg border border-slate-200/80 bg-slate-100 p-1 dark:border-white/10 dark:bg-slate-800/80 sm:w-auto" aria-label="Tab kategori dan satuan">
         <Link
           href="/admin/categories"
           className="flex-1 sm:flex-initial px-5 py-1.5 text-center text-sm font-semibold rounded-md bg-white text-slate-900 shadow-sm dark:bg-slate-700 dark:text-white transition-all"

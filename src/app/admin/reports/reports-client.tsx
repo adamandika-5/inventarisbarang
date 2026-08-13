@@ -426,11 +426,20 @@ export default function ReportsClient({
           </div>
         ) : (
           <div>
-            <div className="w-full overflow-x-auto">
-              <table className="table min-w-[900px] w-full">
+            <div className="table-container border-t-0 border-slate-200/80 dark:border-white/10">
+              <table className="table min-w-[1100px] table-fixed divide-y-0">
+                <colgroup>
+                  <col className="w-[19%]" />
+                  <col className="w-[15%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[17%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[11%]" />
+                  <col className="w-[11%]" />
+                </colgroup>
                 <thead>
                   <tr>
-                    <th className="min-w-[170px] whitespace-nowrap">NO. TRANSAKSI</th>
+                    <th className="whitespace-nowrap">NO. TRANSAKSI</th>
                     <th className="whitespace-nowrap">TANGGAL (WIB)</th>
                     <th>JENIS</th>
                     <th>BARANG</th>
@@ -442,7 +451,7 @@ export default function ReportsClient({
                 <tbody>
                   {transactions.map((tx) => (
                     <tr key={tx.id} className={tx.is_reversed ? 'opacity-50' : ''}>
-                      <td className="min-w-[180px] whitespace-nowrap font-mono text-xs">
+                      <td className="whitespace-nowrap font-mono text-xs">
                         <span className="code-chip inline-block whitespace-nowrap">{tx.transaction_number}</span>
                       </td>
                       <td className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
@@ -450,7 +459,7 @@ export default function ReportsClient({
                       </td>
                       <td>
                         <span
-                          className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_CLASSES[tx.transaction_type] ?? 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
+                          className={`inline-flex whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${TYPE_CLASSES[tx.transaction_type] ?? 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300'
                             }`}
                         >
                           {TYPE_LABELS[tx.transaction_type] ?? tx.transaction_type}
@@ -463,7 +472,7 @@ export default function ReportsClient({
                         </span>
                         <span className="block text-xs text-slate-400 dark:text-slate-500">{tx.items?.sku}</span>
                       </td>
-                      <td className="text-right tabular-nums">
+                      <td className="whitespace-nowrap text-right tabular-nums">
                         <span
                           className={tx.quantity_delta >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
                         >
@@ -528,14 +537,22 @@ export default function ReportsClient({
               <p className="text-sm text-green-600 dark:text-green-400">✓ Semua barang memiliki stok di atas minimum.</p>
             </div>
           ) : (
-            <div className="table-container">
-              <table className="table">
+            <div className="table-container border-t-0 border-slate-200/80 dark:border-white/10">
+              <table className="table min-w-[760px] table-fixed divide-y-0">
+                <colgroup>
+                  <col className="w-[12%]" />
+                  <col className="w-[28%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[16%]" />
+                  <col className="w-[12%]" />
+                  <col className="w-[16%]" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th>SKU</th>
                     <th>Nama Barang</th>
-                    <th className="text-right">Stok Saat Ini</th>
-                    <th className="text-right">Stok Minimum</th>
+                    <th className="whitespace-nowrap text-center">Stok Saat Ini</th>
+                    <th className="whitespace-nowrap text-center">Stok Minimum</th>
                     <th>Satuan</th>
                     <th>Status</th>
                   </tr>
@@ -545,16 +562,16 @@ export default function ReportsClient({
                     <tr key={item.id}>
                       <td className="font-mono text-xs text-slate-700 dark:text-slate-300">{item.sku}</td>
                       <td className="font-medium text-slate-900 dark:text-slate-100">{item.name}</td>
-                      <td className="text-right tabular-nums font-bold text-red-600 dark:text-red-400">
+                      <td className="text-center tabular-nums font-bold text-red-600 dark:text-red-400">
                         {item.current_stock.toLocaleString('id-ID')}
                       </td>
-                      <td className="text-right tabular-nums text-slate-600 dark:text-slate-300">
+                      <td className="text-center tabular-nums text-slate-600 dark:text-slate-300">
                         {item.minimum_stock.toLocaleString('id-ID')}
                       </td>
                       <td className="text-slate-500 dark:text-slate-400">
                         {item.base_unit?.symbol ?? '—'}
                       </td>
-                      <td>
+                      <td className="whitespace-nowrap">
                         {item.current_stock === 0 ? (
                           <span className="badge-habis">Habis</span>
                         ) : (
