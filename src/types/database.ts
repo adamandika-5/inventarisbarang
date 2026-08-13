@@ -474,6 +474,14 @@ export type Database = {
         }
         Returns: undefined
       }
+      create_employee_account_v2: {
+        Args: {
+          p_username: string
+          p_full_name: string
+          p_auth_user_id: string
+        }
+        Returns: undefined
+      }
       // Process stock OUT transaction (employee)
       process_stock_out: {
         Args: {

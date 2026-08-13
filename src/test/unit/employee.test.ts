@@ -37,7 +37,7 @@ function generateInternalEmail(normalizedUsername: string): string {
 
 // --- Safe error logging (must never contain password) ---
 function buildSafeLogMessage(errorCode: string, errorMessage: string): string {
-  return `create_employee_account RPC failed - code: ${errorCode}, message: ${errorMessage}`
+  return `create_employee_account_v2 RPC failed - code: ${errorCode}, message: ${errorMessage}`
 }
 
 describe('Employee Creation — Username Normalization', () => {
@@ -114,7 +114,7 @@ describe('Employee Creation — Password Validation', () => {
 describe('Employee Creation — Safe Error Logging', () => {
   it('should format log message with code and message', () => {
     const log = buildSafeLogMessage('42501', 'FORBIDDEN: Admin role required')
-    expect(log).toBe('create_employee_account RPC failed - code: 42501, message: FORBIDDEN: Admin role required')
+    expect(log).toBe('create_employee_account_v2 RPC failed - code: 42501, message: FORBIDDEN: Admin role required')
   })
 
   it('should never include password in log message', () => {

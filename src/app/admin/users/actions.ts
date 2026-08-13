@@ -183,17 +183,16 @@ export async function createEmployee(formData: FormData): Promise<ActionResult> 
 
     // Call RPC via session client so auth.uid() = admin who is logged in
     // RPC creates: profile, private.auth_login_identifiers, audit log atomically
-    const { error: rpcError } = await supabase.rpc('create_employee_account', {
+    const { error: rpcError } = await supabase.rpc('create_employee_account_v2', {
       p_username: normalizedUsername,
       p_full_name: parsed.data.full_name,
-      p_temporary_password: parsed.data.password,
       p_auth_user_id: authUser.user.id,
     })
 
     if (rpcError) {
       // Log safe diagnostic info (NEVER log password or credentials)
       console.error(
-        `create_employee_account RPC failed - code: ${rpcError.code}, message: ${rpcError.message}`
+        `create_employee_account_v2 RPC failed - code: ${rpcError.code}, message: ${rpcError.message}`
       )
       // Rollback: delete the auth user we just created
       await adminClient.auth.admin.deleteUser(authUser.user.id)
