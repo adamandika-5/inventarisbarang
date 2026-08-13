@@ -62,12 +62,17 @@ export default function LoginForm() {
         })
 
         if (!response.ok) {
-          // Generic error message — never reveal if username exists or not
+          const generalError =
+            response.status === 429
+              ? 'Terlalu banyak percobaan masuk. Tunggu beberapa menit lalu coba lagi.'
+              : 'Username atau kata sandi tidak valid. Silakan coba lagi.'
+
+          // Neither message reveals whether the submitted username exists.
           setState((prev) => ({
             ...prev,
             isSubmitting: false,
             errors: {
-              general: 'Username atau kata sandi tidak valid. Silakan coba lagi.',
+              general: generalError,
             },
           }))
           return

@@ -444,6 +444,35 @@ export type Database = {
       }
     }
     Functions: {
+      // Resolve a normalized username for the server-side login BFF.
+      lookup_login_identifier: {
+        Args: {
+          p_username_normalized: string
+        }
+        Returns: Array<{
+          auth_user_id: string
+        }>
+      }
+      // Consume distributed login-attempt counters (service role only).
+      consume_login_rate_limit: {
+        Args: {
+          p_account_hash: string
+          p_ip_hash: string
+          p_account_ip_hash: string
+        }
+        Returns: Array<{
+          allowed: boolean
+          retry_after_seconds: number
+        }>
+      }
+      // Clear account counters after a successful login (service role only).
+      reset_login_rate_limit: {
+        Args: {
+          p_account_hash: string
+          p_account_ip_hash: string
+        }
+        Returns: undefined
+      }
       // Check if current user is admin
       is_admin: {
         Args: Record<string, unknown>
@@ -648,6 +677,26 @@ export type Database = {
         Update: Partial<Database['private']['Tables']['auth_login_identifiers']['Row']>
         Relationships: []
       }
+      login_rate_limit_buckets: {
+        Row: {
+          bucket_type: 'ACCOUNT_IP' | 'ACCOUNT' | 'IP'
+          bucket_key: string
+          window_started_at: string
+          attempt_count: number
+          blocked_until: string | null
+          updated_at: string
+        }
+        Insert: {
+          bucket_type: 'ACCOUNT_IP' | 'ACCOUNT' | 'IP'
+          bucket_key: string
+          window_started_at: string
+          attempt_count?: number
+          blocked_until?: string | null
+          updated_at?: string
+        }
+        Update: Partial<Database['private']['Tables']['login_rate_limit_buckets']['Row']>
+        Relationships: []
+      }
       item_costs: {
         Row: {
           id: string
@@ -728,5 +777,7 @@ export type EmployeeItemView = Database['public']['Views']['employee_items_view'
 export type EmployeeTransactionView =
   Database['public']['Views']['employee_own_transactions_view']['Row']
 export type ItemCost = Database['private']['Tables']['item_costs']['Row']
+export type LoginRateLimitBucket =
+  Database['private']['Tables']['login_rate_limit_buckets']['Row']
 export type StockTransactionCost =
   Database['private']['Tables']['stock_transaction_costs']['Row']
