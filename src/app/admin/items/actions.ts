@@ -207,13 +207,16 @@ export async function updateItem(id: string, formData: FormData): Promise<Action
     const { supabase, isAdmin } = await verifyAdmin()
     if (!isAdmin) return { success: false, error: 'Akses ditolak.' }
 
+    const rawNotes = formData.get('notes')
+
     const rawData = {
       name: (formData.get('name') as string) || undefined,
       category_id: (formData.get('category_id') as string) || undefined,
       barcode: (formData.get('barcode') as string) || undefined,
       barcode_format: (formData.get('barcode_format') as string) || undefined,
       minimum_stock: (formData.get('minimum_stock') as string) || undefined,
-      notes: (formData.get('notes') as string) || undefined,
+      // Preserve an empty string so an admin can clear an existing note.
+      notes: typeof rawNotes === 'string' ? rawNotes : undefined,
     }
 
     const parsed = itemUpdateSchema.safeParse(rawData)

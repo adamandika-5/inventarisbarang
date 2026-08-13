@@ -143,7 +143,7 @@ export async function createEmployee(formData: FormData): Promise<ActionResult> 
         .pipe(
           z.string()
             .min(3, 'Username minimal 3 karakter.')
-            .max(50, 'Username maksimal 50 karakter.')
+            .max(32, 'Username maksimal 32 karakter.')
             .regex(/^[a-z0-9._-]+$/, 'Username hanya boleh huruf kecil, angka, titik, underscore, atau dash.')
         ),
       full_name: z.string().min(1, 'Nama lengkap wajib diisi.').max(200).trim(),

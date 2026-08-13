@@ -61,12 +61,19 @@ export async function processAdjustment(formData: FormData): Promise<AdjustmentR
     revalidatePath('/admin/adjustments')
     revalidatePath('/admin/items')
 
-    const result = data as { transaction_number: string | null; quantity_delta: number } | null
+    const result = data as {
+      transaction_number: string | null
+      quantity_delta: number
+      stock_after?: number
+    } | null
     return {
       success: true,
       data: {
         transaction_number: result?.transaction_number ?? undefined,
         delta: result?.quantity_delta ?? 0,
+        // Migration 014 currently omits stock_after from the JSON response.
+        // A successful adjustment always sets stock to the validated physical count.
+        new_stock: result?.stock_after ?? parsed.data.physical_stock,
       },
     }
   } catch {

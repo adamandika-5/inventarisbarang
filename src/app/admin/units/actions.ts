@@ -117,7 +117,11 @@ export async function updateUnit(id: string, formData: FormData): Promise<Action
 
     const { error } = await supabase
       .from('units')
-      .update({ name: parsed.data.name, symbol: parsed.data.symbol })
+      .update({
+        name: parsed.data.name,
+        name_normalized: parsed.data.name.toLowerCase(),
+        symbol: parsed.data.symbol,
+      })
       .eq('id', id)
 
     if (error) {

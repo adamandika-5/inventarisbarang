@@ -8,6 +8,7 @@
 import { useState, useTransition, useRef } from 'react'
 import Link from 'next/link'
 import ItemSearchInput from '@/components/item-search-input'
+import { formatAdjustmentSuccessMessage } from '@/lib/stock-adjustment'
 import { processAdjustment } from './actions'
 
 interface AdjTx {
@@ -77,7 +78,12 @@ export default function AdjustmentForm({ recentAdjustments }: { recentAdjustment
       if (result.success) {
         showMsg(
           'success',
-          `Penyesuaian ${result.data?.transaction_number ?? ''} berhasil. Delta: ${result.data?.delta ?? 0 > 0 ? '+' : ''}${result.data?.delta} · Stok baru: ${result.data?.new_stock?.toLocaleString('id-ID')} ${selectedItem.base_unit?.symbol}`,
+          formatAdjustmentSuccessMessage({
+            transactionNumber: result.data?.transaction_number,
+            delta: result.data?.delta,
+            newStock: result.data?.new_stock,
+            unitSymbol: selectedItem.base_unit?.symbol,
+          }),
         )
         setSelectedItem(null)
         setPhysicalStock('')
@@ -309,4 +315,3 @@ export default function AdjustmentForm({ recentAdjustments }: { recentAdjustment
     </div>
   )
 }
-

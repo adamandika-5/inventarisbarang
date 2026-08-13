@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, type FormEvent } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import { PasswordInput } from '@/components/password-input'
 import { toggleUserActive, resetUserPassword } from './actions'
 
 interface User {
@@ -32,6 +33,9 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
   const searchParams = useSearchParams()
   const [isPending, startTransition] = useTransition()
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [resetTarget, setResetTarget] = useState<Pick<User, 'id' | 'full_name'> | null>(null)
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetError, setResetError] = useState<string | null>(null)
   const totalPages = Math.ceil(totalCount / pageSize)
 
   const showMsg = (type: 'success' | 'error', text: string) => {
@@ -39,10 +43,18 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
     setTimeout(() => setMessage(null), 5000)
   }
 
-  const updateParam = (key: string, value: string) => {
+  const updateSearch = (value: string) => {
     const p = new URLSearchParams(searchParams.toString())
-    if (value) p.set(key, value); else p.delete(key)
+    const normalizedSearch = value.trim()
+    if (normalizedSearch) p.set('search', normalizedSearch)
+    else p.delete('search')
     p.set('page', '1')
+    router.push(`${pathname}?${p.toString()}`)
+  }
+
+  const goToPage = (targetPage: number) => {
+    const p = new URLSearchParams(searchParams.toString())
+    p.set('page', String(targetPage))
     router.push(`${pathname}?${p.toString()}`)
   }
 
@@ -60,23 +72,47 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
     })
   }
 
-  const handleResetPassword = (id: string, fullName: string) => {
-    const tempPass = prompt(`Reset password ${fullName}.\n\nMasukkan password sementara (minimal 6 karakter):`)
-    if (!tempPass || tempPass.length < 6) {
-      if (tempPass !== null) showMsg('error', 'Password sementara minimal 6 karakter.')
+  const openResetPassword = (user: User) => {
+    setResetTarget({ id: user.id, full_name: user.full_name })
+    setResetPassword('')
+    setResetError(null)
+  }
+
+  const closeResetPassword = () => {
+    if (isPending) return
+    setResetTarget(null)
+    setResetPassword('')
+    setResetError(null)
+  }
+
+  const handleResetPassword = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!resetTarget || isPending) return
+
+    if (resetPassword.length < 6) {
+      setResetError('Password sementara minimal 6 karakter.')
       return
     }
-    if (!confirm(`Anda akan mengatur ulang password ${fullName}. Lanjutkan?`)) return
+    if (resetPassword.length > 72) {
+      setResetError('Password sementara maksimal 72 karakter.')
+      return
+    }
+
+    const target = resetTarget
+    const temporaryPassword = resetPassword
+    setResetError(null)
 
     startTransition(async () => {
       const formData = new FormData()
-      formData.set('user_id', id)
-      formData.set('new_password', tempPass)
+      formData.set('user_id', target.id)
+      formData.set('new_password', temporaryPassword)
       const result = await resetUserPassword(formData)
       if (result.success) {
-        showMsg('success', `Password ${fullName} berhasil direset. Pengguna harus mengganti password saat login.`)
+        setResetTarget(null)
+        setResetPassword('')
+        showMsg('success', `Password ${target.full_name} berhasil direset. Pengguna harus mengganti password saat login.`)
       } else {
-        showMsg('error', result.error ?? 'Gagal mereset password.')
+        setResetError(result.error ?? 'Gagal mereset password.')
       }
     })
   }
@@ -97,7 +133,7 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
           defaultValue={search}
           className="input w-full sm:w-80 max-w-sm"
           onKeyDown={(e) => {
-            if (e.key === 'Enter') updateParam('search', (e.target as HTMLInputElement).value)
+            if (e.key === 'Enter') updateSearch((e.target as HTMLInputElement).value)
           }}
         />
         <Link href="/admin/users/new" id="btn-tambah-pegawai" className="btn-primary shrink-0 self-start sm:self-auto">
@@ -172,7 +208,7 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
                           id={`btn-reset-password-${user.id}`}
                           type="button"
                           className="btn-secondary min-h-[36px] h-[36px] px-2.5 py-1 text-xs font-medium whitespace-nowrap inline-flex items-center justify-center"
-                          onClick={() => handleResetPassword(user.id, user.full_name)}
+                          onClick={() => openResetPassword(user)}
                           disabled={isPending}
                         >
                           Reset Password
@@ -194,15 +230,71 @@ export default function UsersClient({ initialUsers, totalCount, page, pageSize, 
           <p className="text-sm text-slate-600 dark:text-slate-300">Halaman {page} dari {totalPages} ({totalCount} pengguna)</p>
           <div className="flex gap-2">
             <button type="button" className="btn-secondary text-sm"
-              onClick={() => updateParam('page', String(page - 1))} disabled={page <= 1}>
+              onClick={() => goToPage(page - 1)} disabled={page <= 1}>
               &laquo; Sebelumnya
             </button>
             <button type="button" className="btn-secondary text-sm"
-              onClick={() => updateParam('page', String(page + 1))} disabled={page >= totalPages}>
+              onClick={() => goToPage(page + 1)} disabled={page >= totalPages}>
               Berikutnya &raquo;
             </button>
           </div>
         </nav>
+      )}
+
+      {resetTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reset-password-title"
+        >
+          <form
+            onSubmit={handleResetPassword}
+            className="w-full max-w-md space-y-4 rounded-lg border border-slate-200 bg-white p-6 shadow-xl dark:border-white/10 dark:bg-[#17263D]"
+          >
+            <div>
+              <h2 id="reset-password-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+                Reset Password Pegawai
+              </h2>
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                Atur password sementara untuk <strong>{resetTarget.full_name}</strong>.
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="reset-user-password" className="label mb-1">
+                Password Sementara <span className="text-red-500">*</span>
+              </label>
+              <PasswordInput
+                id="reset-user-password"
+                name="new_password"
+                value={resetPassword}
+                onChange={(event) => setResetPassword(event.target.value)}
+                autoComplete="new-password"
+                minLength={6}
+                maxLength={72}
+                required
+                autoFocus
+                disabled={isPending}
+                className="input"
+              />
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                Panjang 6–72 karakter. Pengguna harus menggantinya saat login berikutnya.
+              </p>
+            </div>
+
+            {resetError && <div role="alert" className="alert-error text-sm">{resetError}</div>}
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" className="btn-secondary" onClick={closeResetPassword} disabled={isPending}>
+                Batal
+              </button>
+              <button type="submit" className="btn-primary" disabled={isPending}>
+                {isPending ? 'Mereset…' : 'Reset Password'}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
     </div>
   )

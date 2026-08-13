@@ -49,7 +49,6 @@ const stockOutSchema = z.object({
     .string()
     .regex(/^[1-9]\d*$/, 'Jumlah harus berupa bilangan bulat positif.')
     .transform((v) => parseInt(v, 10)),
-  reason: z.string().max(500, 'Alasan maksimal 500 karakter.').optional(),
 })
 
 /**
@@ -68,7 +67,6 @@ export async function processEmployeeStockOut(formData: FormData): Promise<Actio
       item_id: formData.get('item_id') as string,
       unit_id: formData.get('unit_id') as string,
       input_quantity: formData.get('input_quantity') as string,
-      reason: (formData.get('reason') as string) || undefined,
     }
 
     const parsed = stockOutSchema.safeParse(rawData)

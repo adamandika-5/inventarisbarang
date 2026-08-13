@@ -87,6 +87,15 @@ export default function ItemsClient({
     [pathname, router, searchParams],
   )
 
+  const goToPage = useCallback(
+    (targetPage: number) => {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('page', String(targetPage))
+      router.push(`${pathname}?${params.toString()}`)
+    },
+    [pathname, router, searchParams],
+  )
+
   const handleConfirmDeactivate = () => {
     if (!deactivateTarget || isPending) return
     setModalError(null)
@@ -291,7 +300,7 @@ export default function ItemsClient({
               id="btn-prev-page"
               type="button"
               className="btn-secondary text-sm"
-              onClick={() => updateFilter('page', String(page - 1))}
+              onClick={() => goToPage(page - 1)}
               disabled={page <= 1}
             >
               &laquo; Sebelumnya
@@ -300,7 +309,7 @@ export default function ItemsClient({
               id="btn-next-page"
               type="button"
               className="btn-secondary text-sm"
-              onClick={() => updateFilter('page', String(page + 1))}
+              onClick={() => goToPage(page + 1)}
               disabled={page >= totalPages}
             >
               Berikutnya &raquo;

@@ -1,5 +1,7 @@
 ﻿import type { Metadata } from 'next'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { normalizePageNumber } from '@/lib/pagination'
+import { redirect } from 'next/navigation'
 import UsersClient from './users-client'
 
 export const metadata: Metadata = {
@@ -14,7 +16,7 @@ export default async function UsersPage({
   const supabase = await createSupabaseServerClient()
   const params = await searchParams
   const search = params.search?.trim() ?? ''
-  const page = Math.max(1, parseInt(params.page ?? '1', 10))
+  const page = normalizePageNumber(params.page)
   const pageSize = 25
 
   let query = supabase
@@ -33,6 +35,16 @@ export default async function UsersPage({
     return <div className="alert-error">Gagal memuat data pengguna.</div>
   }
 
+  const totalCount = count ?? 0
+  const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+
+  if (totalCount > 0 && page > totalPages) {
+    const nextParams = new URLSearchParams()
+    if (search) nextParams.set('search', search)
+    nextParams.set('page', String(totalPages))
+    redirect(`/admin/users?${nextParams.toString()}`)
+  }
+
   return (
     <div>
       <div className="mb-6">
@@ -41,7 +53,7 @@ export default async function UsersPage({
       </div>
       <UsersClient
         initialUsers={users ?? []}
-        totalCount={count ?? 0}
+        totalCount={totalCount}
         page={page}
         pageSize={pageSize}
         search={search}

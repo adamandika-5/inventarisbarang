@@ -55,12 +55,12 @@ export default function NewEmployeeForm() {
             type="text"
             required
             minLength={3}
-            maxLength={50}
+            maxLength={32}
             pattern="[a-z0-9._\-]+"
             placeholder="huruf kecil, angka, titik, _ atau -"
             className="input font-mono"
           />
-          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Huruf kecil, angka, titik, underscore, atau dash. Minimal 3 karakter.</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Huruf kecil, angka, titik, underscore, atau dash. Panjang 3–32 karakter.</p>
         </div>
 
         <div>

@@ -25,7 +25,7 @@ function validatePassword(password: string): string | null {
 function validateUsername(raw: string): string | null {
   const normalized = normalizeUsername(raw)
   if (normalized.length < 3) return 'Username minimal 3 karakter.'
-  if (normalized.length > 50) return 'Username maksimal 50 karakter.'
+  if (normalized.length > 32) return 'Username maksimal 32 karakter.'
   if (!/^[a-z0-9._-]+$/.test(normalized)) return 'Username hanya boleh huruf kecil, angka, titik, underscore, atau dash.'
   return null
 }
@@ -82,6 +82,11 @@ describe('Employee Creation — Username Validation', () => {
   it('should normalize uppercase before validating', () => {
     // "ABC" normalizes to "abc" which is valid
     expect(validateUsername('ABC')).toBeNull()
+  })
+
+  it('should accept 32 characters and reject usernames longer than the database limit', () => {
+    expect(validateUsername('a'.repeat(32))).toBeNull()
+    expect(validateUsername('a'.repeat(33))).toBe('Username maksimal 32 karakter.')
   })
 })
 

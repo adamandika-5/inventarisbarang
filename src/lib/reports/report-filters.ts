@@ -1,8 +1,10 @@
 import { addDays, parseISO } from 'date-fns'
 import { formatInTimeZone } from 'date-fns-tz'
+import { normalizePageNumber } from '@/lib/pagination'
+
+export { MAX_SAFE_PAGE, normalizePageNumber } from '@/lib/pagination'
 
 export const REPORT_TIME_ZONE = 'Asia/Jakarta'
-export const MAX_SAFE_PAGE = 1_000_000
 
 export interface RawReportFilterParams {
   from?: string | null
@@ -52,19 +54,6 @@ export function isValidCalendarDate(dateStr?: string | null): boolean {
   if (year < 1 || month < 1 || month > 12 || day < 1 || day > 31) return false
   const d = new Date(Date.UTC(year, month - 1, day))
   return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day
-}
-
-/**
- * Validates and normalizes page number.
- * Returns 1 for null, empty, non-numeric, decimal, negative, Infinity, or values > MAX_SAFE_PAGE.
- */
-export function normalizePageNumber(rawPage: unknown): number {
-  if (rawPage === null || rawPage === undefined) return 1
-  const str = String(rawPage).trim()
-  if (!/^\d+$/.test(str)) return 1
-  const num = Number(str)
-  if (!Number.isSafeInteger(num) || num < 1 || num > MAX_SAFE_PAGE) return 1
-  return num
 }
 
 /**

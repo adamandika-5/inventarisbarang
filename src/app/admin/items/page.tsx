@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { normalizePageNumber } from '@/lib/pagination'
 import ItemsClient from './items-client'
 
 export const metadata: Metadata = {
@@ -32,7 +33,7 @@ export default async function ItemsPage({
   const search = params.search?.trim() ?? ''
   const categoryFilter = params.category ?? ''
   const activeFilter = params.active ?? 'true' // default: show active items
-  const page = Math.max(1, parseInt(params.page ?? '1', 10))
+  const page = normalizePageNumber(params.page)
   const pageSize = 25
   const offset = (page - 1) * pageSize
 
