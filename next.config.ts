@@ -52,6 +52,26 @@ const nextConfig: NextConfig = {
           },
         ],
       },
+      {
+        // Installed PWAs must revalidate launch metadata after a deployment.
+        source: '/manifest.json',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, must-revalidate',
+          },
+        ],
+      },
+      {
+        // Ensure cache cleanup and PWA fixes reach existing installations.
+        source: '/sw.js',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=0, must-revalidate',
+          },
+        ],
+      },
     ]
   },
 }

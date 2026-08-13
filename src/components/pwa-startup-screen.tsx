@@ -76,7 +76,13 @@ export function PwaStartupScreen() {
       aria-live="polite"
       aria-label="Menyiapkan aplikasi Inventaris Barang"
     >
-      <BrandedLoader title="Inventaris Barang" message="Menyiapkan aplikasi dengan aman..." />
+      <div className="pwa-startup-screen__panel">
+        <BrandedLoader
+          title="Menyiapkan Aplikasi"
+          message="Memuat sesi dan data Anda..."
+          compact
+        />
+      </div>
     </div>
   )
 }

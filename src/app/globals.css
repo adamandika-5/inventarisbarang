@@ -530,6 +530,7 @@
   -webkit-backdrop-filter: blur(8px);
 }
 
+.pwa-startup-screen__panel,
 .login-loading-overlay__panel {
   width: min(90vw, 22rem);
   border: 1px solid rgb(255 255 255 / 0.14);

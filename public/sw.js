@@ -16,13 +16,12 @@
 
 // Bump the cache whenever manifest/icons change so installed PWAs do not keep
 // an outdated splash screen.
-const CACHE_NAME = 'inventarisbarang-shell-v2'
+const CACHE_NAME = 'inventarisbarang-shell-v3'
 
 // Only cache the application shell and static assets
 const SHELL_ASSETS = [
   '/_next/static/',
   '/icons/',
-  '/manifest.json',
 ]
 
 // URLs that should NEVER be cached
@@ -69,7 +68,9 @@ self.addEventListener('fetch', (event) => {
     return // Network-only for sensitive data
   }
 
-  // For static assets (_next/static, icons, manifest), use cache-first
+  // For versioned static assets (_next/static and icons), use cache-first.
+  // The manifest deliberately stays network-managed so Android can pick up
+  // splash-screen changes without being pinned to an old service-worker cache.
   const isStaticAsset = SHELL_ASSETS.some((pattern) => url.pathname.startsWith(pattern))
 
   if (isStaticAsset) {

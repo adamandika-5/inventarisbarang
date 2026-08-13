@@ -10,7 +10,9 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 export const metadata: Metadata = {
   title: 'Inventaris Barang BPS Kota Mojokerto',
   description: 'Sistem Pengelolaan Inventaris Barang BPS Kota Mojokerto',
-  manifest: '/manifest.json',
+  // Query revision forces existing Android installations to fetch the updated
+  // launch colors while the manifest `id` keeps the same PWA identity.
+  manifest: '/manifest.json?v=3',
   applicationName: 'Inventaris Barang BPS Kota Mojokerto',
   keywords: ['inventaris', 'barang', 'stok', 'BPS', 'Mojokerto', 'persediaan'],
   robots: {

@@ -49,7 +49,15 @@ describe('PWA startup experience', () => {
     expect(manifest.background_color).toBe('#101d31')
     expect(manifest.theme_color).toBe('#101d31')
     expect(manifest.icons.every((icon) => icon.purpose === 'any')).toBe(true)
-    expect(readSource('public/sw.js')).toContain('inventarisbarang-shell-v2')
+    const serviceWorker = readSource('public/sw.js')
+    const layout = readSource('src/app/layout.tsx')
+    const nextConfig = readSource('next.config.ts')
+
+    expect(serviceWorker).toContain('inventarisbarang-shell-v3')
+    expect(serviceWorker).not.toMatch(/SHELL_ASSETS\s*=\s*\[[\s\S]*?'\/manifest\.json'/)
+    expect(layout).toContain("manifest: '/manifest.json?v=3'")
+    expect(nextConfig).toContain("source: '/manifest.json'")
+    expect(nextConfig).toContain("source: '/sw.js'")
   })
 
   it('shows the animated hand-off only in standalone mode and attempts a portrait lock', () => {
@@ -79,6 +87,9 @@ describe('PWA startup experience', () => {
     expect(
       screen.getByRole('status', { name: /menyiapkan aplikasi inventaris barang/i }),
     ).toHaveAttribute('data-phase', 'visible')
+    expect(screen.getByText('Menyiapkan Aplikasi')).toBeVisible()
+    expect(screen.getByText('Memuat sesi dan data Anda...')).toBeVisible()
+    expect(screen.getByRole('status').firstElementChild).toHaveClass('pwa-startup-screen__panel')
     expect(lock).toHaveBeenCalledWith('portrait-primary')
 
     act(() => vi.advanceTimersByTime(450))
