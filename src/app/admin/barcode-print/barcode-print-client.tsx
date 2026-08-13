@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { BarcodeFormat } from '@/types/database'
+import { BARCODE_LABEL_WIDTH_PX, buildBarcodeRenderOptions } from '@/lib/barcode-render'
 
 type Item = {
   id: string
@@ -23,16 +24,6 @@ type Item = {
 type SelectedItem = {
   item: Item
   copies: number
-}
-
-// Map our BarcodeFormat enum to bwip-js bcid strings
-const BCID_MAP: Record<BarcodeFormat, string> = {
-  EAN13: 'ean13',
-  EAN8: 'ean8',
-  UPCA: 'upca',
-  UPCE: 'upce',
-  CODE128: 'code128',
-  QR: 'qrcode',
 }
 
 // Minimum character count required per format
@@ -75,15 +66,7 @@ function BarcodeLabel({ item, index }: { item: Item; index: number }) {
       .then((bwipjs) => {
         try {
           setRenderError(null)
-          bwipjs.toCanvas(canvas, {
-            bcid: BCID_MAP[item.barcode_format],
-            text: item.barcode.trim(),
-            scale: 3,
-            height: item.barcode_format === 'QR' ? 20 : 10,
-            includetext: item.barcode_format !== 'QR',
-            textxalign: 'center',
-            monochrome: true,
-          })
+          bwipjs.toCanvas(canvas, buildBarcodeRenderOptions(item.barcode, item.barcode_format))
         } catch (e) {
           setRenderError(
             'Gagal render barcode: ' + (e instanceof Error ? e.message : 'Error tidak diketahui'),
@@ -103,7 +86,7 @@ function BarcodeLabel({ item, index }: { item: Item; index: number }) {
     <div
       className="barcode-label flex flex-col items-center rounded-lg border border-gray-200 bg-white p-3 text-center shadow-sm"
       data-label-index={index}
-      style={{ width: 180, minHeight: 120 }}
+      style={{ width: BARCODE_LABEL_WIDTH_PX, minHeight: 180 }}
     >
       <p className="mb-1 w-full truncate text-xs font-semibold text-gray-800" title={item.name}>
         {item.name}
@@ -114,7 +97,11 @@ function BarcodeLabel({ item, index }: { item: Item; index: number }) {
           <p className="text-xs text-red-500">{renderError}</p>
         </div>
       ) : (
-        <canvas ref={canvasRef} className="max-w-full" aria-label={`Barcode untuk ${item.name}`} />
+        <canvas
+          ref={canvasRef}
+          className="block max-w-full"
+          aria-label={`Barcode untuk ${item.name}`}
+        />
       )}
     </div>
   )
@@ -125,7 +112,10 @@ interface BarcodePrintClientProps {
   defaultLabelCount?: number
 }
 
-export default function BarcodePrintClient({ items, defaultLabelCount = 1 }: BarcodePrintClientProps) {
+export default function BarcodePrintClient({
+  items,
+  defaultLabelCount = 1,
+}: BarcodePrintClientProps) {
   const [search, setSearch] = useState('')
   const [selectedItems, setSelectedItems] = useState<SelectedItem[]>([])
   const [copiesInput, setCopiesInput] = useState<Record<string, string>>({})
@@ -143,7 +133,8 @@ export default function BarcodePrintClient({ items, defaultLabelCount = 1 }: Bar
     if (isSelected(item.id)) {
       setSelectedItems((prev) => prev.filter((s) => s.item.id !== item.id))
     } else {
-      const initialCopies = defaultLabelCount >= 1 && defaultLabelCount <= 500 ? defaultLabelCount : 1
+      const initialCopies =
+        defaultLabelCount >= 1 && defaultLabelCount <= 500 ? defaultLabelCount : 1
       setSelectedItems((prev) => [...prev, { item, copies: initialCopies }])
       setCopiesInput((prev) => ({ ...prev, [item.id]: String(initialCopies) }))
     }
@@ -153,9 +144,7 @@ export default function BarcodePrintClient({ items, defaultLabelCount = 1 }: Bar
     setCopiesInput((prev) => ({ ...prev, [id]: value }))
     const num = parseInt(value, 10)
     if (!isNaN(num) && num >= 1 && num <= 100) {
-      setSelectedItems((prev) =>
-        prev.map((s) => (s.item.id === id ? { ...s, copies: num } : s)),
-      )
+      setSelectedItems((prev) => prev.map((s) => (s.item.id === id ? { ...s, copies: num } : s)))
     }
   }
 
@@ -206,7 +195,9 @@ export default function BarcodePrintClient({ items, defaultLabelCount = 1 }: Bar
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Left panel: item selector */}
         <div className="card">
-          <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-white">Pilih Barang</h2>
+          <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-white">
+            Pilih Barang
+          </h2>
 
           <div className="mb-3">
             <input
@@ -221,7 +212,7 @@ export default function BarcodePrintClient({ items, defaultLabelCount = 1 }: Bar
           </div>
 
           {items.length === 0 ? (
-            <div className="rounded-md border border-dashed border-slate-300 dark:border-white/20 py-10 text-center">
+            <div className="rounded-md border border-dashed border-slate-300 py-10 text-center dark:border-white/20">
               <svg
                 className="mx-auto mb-2 h-10 w-10 text-slate-300 dark:text-slate-500"
                 fill="none"
@@ -236,14 +227,20 @@ export default function BarcodePrintClient({ items, defaultLabelCount = 1 }: Bar
                   d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
                 />
               </svg>
-              <p className="text-sm text-slate-500 dark:text-slate-300 font-medium">Belum ada barang aktif.</p>
-              <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">Tambahkan barang di menu Data Barang terlebih dahulu.</p>
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-300">
+                Belum ada barang aktif.
+              </p>
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">
+                Tambahkan barang di menu Data Barang terlebih dahulu.
+              </p>
             </div>
           ) : filteredItems.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-300">Tidak ada barang yang cocok.</p>
+            <p className="py-6 text-center text-sm text-slate-500 dark:text-slate-300">
+              Tidak ada barang yang cocok.
+            </p>
           ) : (
             <ul
-              className="max-h-96 divide-y divide-slate-100 dark:divide-white/10 overflow-y-auto rounded-md border border-slate-200 dark:border-white/10"
+              className="max-h-96 divide-y divide-slate-100 overflow-y-auto rounded-md border border-slate-200 dark:divide-white/10 dark:border-white/10"
               aria-label="Daftar barang"
             >
               {filteredItems.map((item) => {
@@ -260,15 +257,19 @@ export default function BarcodePrintClient({ items, defaultLabelCount = 1 }: Bar
                         selected
                           ? 'bg-blue-50 text-blue-900 dark:bg-[#22D3EE]/20 dark:text-[#22D3EE]'
                           : valid
-                            ? 'text-slate-800 dark:text-white hover:bg-slate-50 dark:hover:bg-[#203552]'
-                            : 'cursor-not-allowed text-slate-400 dark:text-slate-500 opacity-60'
+                            ? 'text-slate-800 hover:bg-slate-50 dark:text-white dark:hover:bg-[#203552]'
+                            : 'cursor-not-allowed text-slate-400 opacity-60 dark:text-slate-500'
                       }`}
                       aria-pressed={selected}
-                      title={valid ? undefined : 'Barcode kosong atau tidak valid — tidak dapat dicetak'}
+                      title={
+                        valid ? undefined : 'Barcode kosong atau tidak valid — tidak dapat dicetak'
+                      }
                     >
                       <span
                         className={`flex h-5 w-5 flex-shrink-0 items-center justify-center rounded border text-xs font-bold ${
-                          selected ? 'border-blue-600 bg-blue-600 dark:border-[#22D3EE] dark:bg-[#22D3EE] text-white dark:text-[#0B1220]' : 'border-slate-300 dark:border-white/20 bg-white dark:bg-[#0B1220]'
+                          selected
+                            ? 'border-blue-600 bg-blue-600 text-white dark:border-[#22D3EE] dark:bg-[#22D3EE] dark:text-[#0B1220]'
+                            : 'border-slate-300 bg-white dark:border-white/20 dark:bg-[#0B1220]'
                         }`}
                         aria-hidden="true"
                       >
@@ -313,20 +314,26 @@ export default function BarcodePrintClient({ items, defaultLabelCount = 1 }: Bar
           </div>
 
           {selectedItems.length === 0 ? (
-            <div className="rounded-md border border-dashed border-slate-300 dark:border-white/20 py-10 text-center">
-              <p className="text-sm text-slate-500 dark:text-slate-300 font-medium">Belum ada barang dipilih.</p>
-              <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">Pilih barang dari daftar di sebelah kiri.</p>
+            <div className="rounded-md border border-dashed border-slate-300 py-10 text-center dark:border-white/20">
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-300">
+                Belum ada barang dipilih.
+              </p>
+              <p className="mt-1 text-xs text-slate-400 dark:text-slate-400">
+                Pilih barang dari daftar di sebelah kiri.
+              </p>
             </div>
           ) : (
             <ul className="mb-4 max-h-72 space-y-2 overflow-y-auto">
               {selectedItems.map(({ item, copies }) => (
                 <li
                   key={item.id}
-                  className="flex items-center gap-3 rounded-md border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#0B1220] px-3 py-2"
+                  className="flex items-center gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 dark:border-white/10 dark:bg-[#0B1220]"
                 >
                   <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-800 dark:text-white">
                     {item.name}
-                    <span className="ml-1 text-xs font-normal text-slate-400 dark:text-slate-400">{item.sku}</span>
+                    <span className="ml-1 text-xs font-normal text-slate-400 dark:text-slate-400">
+                      {item.sku}
+                    </span>
                   </span>
                   <div className="flex items-center gap-1">
                     <label htmlFor={`copies-${item.id}`} className="sr-only">
@@ -349,8 +356,19 @@ export default function BarcodePrintClient({ items, defaultLabelCount = 1 }: Bar
                     className="text-gray-400 hover:text-red-500"
                     aria-label={`Hapus ${item.name} dari daftar cetak`}
                   >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    <svg
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 18L18 6M6 6l12 12"
+                      />
                     </svg>
                   </button>
                 </li>
@@ -363,7 +381,7 @@ export default function BarcodePrintClient({ items, defaultLabelCount = 1 }: Bar
             id="btn-print-barcode"
             onClick={handlePrint}
             disabled={totalLabels === 0}
-            className="btn-primary w-full disabled:bg-slate-200 dark:disabled:bg-[#203552] disabled:text-slate-400 dark:disabled:text-[#8494ab] disabled:opacity-100"
+            className="btn-primary w-full disabled:bg-slate-200 disabled:text-slate-400 disabled:opacity-100 dark:disabled:bg-[#203552] dark:disabled:text-[#8494ab]"
           >
             <svg
               className="mr-2 h-4 w-4"
@@ -392,7 +410,7 @@ export default function BarcodePrintClient({ items, defaultLabelCount = 1 }: Bar
           </h2>
           <div
             id="barcode-print-area"
-            className="rounded-lg border border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#0B1220] p-4"
+            className="rounded-lg border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-[#0B1220]"
           >
             <div className="print-grid flex flex-wrap gap-3">
               {printLabels.map(({ item, key }, index) => (
