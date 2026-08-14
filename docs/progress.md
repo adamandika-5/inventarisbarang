@@ -1,108 +1,174 @@
-# Progress — InventarisBarang
+﻿# Progress â€” InventarisBarang
 
-**Terakhir diperbarui**: 2026-07-21 06:29 WIB  
-**Lingkungan**: Lokal — Quality Gates 100% Passed (Type Check, Lint, Vitest, Build)
+**Terakhir diperbarui:** 2026-08-14
+**Status:** Finalisasi, hardening, testing, dan dokumentasi
 
----
+## Quality Gate Terakhir
 
-## Quality Gate Status (Verified Execution Run)
-
-| Test | Perintah | Status | Hasil |
+| Pemeriksaan | Perintah | Status | Hasil |
 |---|---|---|---|
-| Type check | `npm.cmd run type-check` | ✅ **PASSED** | 0 error (`tsc --noEmit`) |
-| Lint | `npm.cmd run lint` | ✅ **PASSED** | 0 warning, 0 error (`next lint`) |
-| Unit tests | `npm.cmd test` | ✅ **PASSED** | 75 passed (75/75 test cases), 0 failed |
-| Production Build | `npm.cmd run build` | ✅ **PASSED** | 29/29 pages compiled & optimized (termasuk `/admin/import`, `/admin/reports`, dll) |
+| Type check | `npm run type-check` | PASSED | 0 error |
+| Unit tests | `npm run test` | PASSED | 34 test files, 502 tests passed |
+| E2E Playwright | `npm run test:e2e` | PASSED | 5 tests passed |
+| Diff check | `git diff --check` | PASSED | Tidak ada whitespace error |
 
----
+## Database dan Migration
 
-## Milestone 1 — Fondasi dan Analisis ✅
+Migration saat ini tersedia sampai:
 
-### Diselesaikan
+- `001_initial_schema.sql`
+- `002_rls_and_grants.sql`
+- `003_stock_rpc_functions.sql`
+- `004_admin_bootstrap_function.sql`
+- `005_harden_login_lookup_permissions.sql`
+- `006_fix_stock_rpc_item_unit.sql`
+- `007_complete_forced_password_change.sql`
+- `008_get_stock_transaction_costs_rpc.sql`
+- `009_audit_logs_rpc_and_fixes.sql`
+- `010_fix_log_audit_event_rpc.sql`
+- `011_quantity_only_stock_rpcs.sql`
+- `012_dashboard_stats_rpc.sql`
+- `013_report_summary_rpc.sql`
+- `014_fix_idempotency_audit_logs_and_admin_bootstrap.sql`
+- `015_login_rate_limiting.sql`
 
-- [x] Pemeriksaan workspace & Rencana eksekusi (`docs/00-rencana-eksekusi.md`)
-- [x] Scaffold Next.js 15 + TypeScript strict + Tailwind CSS
-- [x] Konfigurasi ESLint & Vitest
-- [x] Structure folder `src/` & Zod Environment validation
-- [x] Supabase client (`server.ts` & `client.ts`) & Database type definitions (`src/types/database.ts`)
-- [x] Middleware route protection & Auth API handlers (`/api/auth/login`, `/api/auth/logout`, `/api/auth/change-password`)
-- [x] Admin & Employee navigation layouts (`src/app/admin/layout.tsx`, `src/app/employee/layout.tsx`)
-- [x] Utility functions: format, barcode validation, SKU generator, spreadsheet sanitization
-- [x] Unit tests: auth, SKU, barcode, stock, format (69 test cases)
+Migration `001â€“015` telah diuji pada project Supabase testing.
 
----
+## Authentication dan Security
 
-## Milestone 2 — Database, Auth, dan RLS ✅ (Code Base)
+Fitur keamanan yang telah diterapkan:
 
-### Diselesaikan
+- Login dengan username melalui BFF
+- Self-signup tidak digunakan
+- Role Admin dan Employee terpisah
+- Pemeriksaan status akun aktif
+- Forced password change
+- Reset password Employee oleh Admin
+- Pesan kegagalan login generik
+- Distributed login rate limiting
+- Rate limiting berdasarkan akun dan sumber request
+- Hashing server-side dengan `LOGIN_RATE_LIMIT_SECRET`
+- Server-side authorization
+- Row Level Security
+- RPC database untuk operasi sensitif
 
-- [x] Migration SQL: `001_initial_schema.sql` (schema public & private, tables, views, triggers)
-- [x] Migration SQL: `002_rls_and_grants.sql` (RLS policies, helper security functions)
-- [x] Migration SQL: `003_stock_rpc_functions.sql` (atomic RPCs with FOR UPDATE locking & Moving Average calculation)
-- [x] Migration SQL: `004_admin_bootstrap_function.sql` (BFF credentials lookup & employee account creation)
-- [x] Script bootstrap admin: `scripts/create-admin.ts`
+## Master Data
 
----
+Fitur master data yang telah tersedia:
 
-## Milestone 3 — Master Data & Modul Transaksi Admin ✅
+- Manajemen barang
+- Manajemen kategori
+- Manajemen satuan
+- Manajemen pengguna
+- Barcode
+- SKU
 
-### Diselesaikan
+## Transaksi Stok
 
-- [x] **Manajemen Kategori** (`/admin/categories`) — CRUD server actions, data table, modal form, filter aktif/nonaktif, validasi duplikat.
-- [x] **Manajemen Satuan** (`/admin/units`) — CRUD server actions, data table, modal form, validasi duplikat nama & simbol.
-- [x] **Manajemen Barang** (`/admin/items`) — Server actions, list barang dengan search & filter kategori/status, form barang baru (`/admin/items/new`) dengan validasi EAN/UPC/CODE128/QR checksum, detail barang (`/admin/items/[id]`), edit & deaktivasi barang.
-- [x] **Barang Masuk / Purchase** (`/admin/stock-in`) — Server action dengan RPC `process_stock_in`, form barang masuk dengan autocomplete item search (`ItemSearchInput`). Memiliki perbaikan parameter RPC (menggunakan `p_unit_price`) serta formatting rupiah ter-integer murni dengan penanganan posisi kursor kustom dan pencegahan wheel scrolling.
-- [x] **Riwayat Barang Keluar** (`/admin/stock-out`) — Tabel riwayat barang keluar admin dengan detail penerima & status pembatalan.
-- [x] **Penyesuaian Stok Fisik** (`/admin/adjustments`) — Form penyesuaian stok dengan RPC `process_stock_adjustment`, validasi selisih stok (stock in / stock out adjustment), catatan alasan wajib.
-- [x] **Pembatalan / Reversal Transaksi** (`/admin/reversals`) — Client view & API route `/api/transactions/reversal` dengan RPC `process_reversal`, pencatatan alasan pembatalan & pembalikan stok otomatis.
-- [x] **Manajemen Pengguna & Pegawai** (`/admin/users`) — Form pegawai baru (`/admin/users/new`) dengan password temporary & paksa ganti password pada login pertama (`must_change_password`), reset password pegawai, toggle status aktif/nonaktif.
-- [x] **Audit Log Viewer** (`/admin/audit-log`) — Tampilan log audit sistem dengan filter aksi (LOGIN, ITEM_CREATE, STOCK_OUT, REVERSAL, dll), pagination & info metadata IP/user-agent.
-- [x] **Pengaturan Aplikasi** (`/admin/settings`) — Form pengaturan nama perusahaan, alamat, telepon, footer nota, & format barcode default.
-- [x] **Komponen Search Autocomplete** (`src/components/item-search-input.tsx` & `/api/items/search`) — Reusable autocomplete search barang untuk form transaksi.
+Fitur transaksi yang telah tersedia:
 
----
+- Stock-in oleh Admin
+- Stock-out oleh Employee
+- Penyesuaian stok
+- Reversal transaksi
+- Atomic RPC
+- Row locking
+- Idempotency menggunakan `client_request_id`
+- Audit log transaksi
 
-## Status External Tests & Remote DB
+## Laporan
 
-| Test | Status | Alasan |
-|---|---|---|
-| Migration ke Supabase remote | BLOCKED | Belum ada Supabase credentials |
-| Integration test RLS | BLOCKED | Butuh database dengan credentials |
-| E2E test browser | BLOCKED | Butuh running app dengan Supabase |
-| Deployment ke Vercel | BLOCKED | Butuh Vercel credentials |
+Fitur laporan yang telah tersedia:
 
----
+- Ringkasan persediaan
+- Laporan transaksi
+- Filter tanggal
+- Export Excel
+- Validasi endpoint export melalui E2E
 
-## Milestone 4 — Import Excel & Cetak Barcode ✅
+## UI dan Operasional
 
-### Diselesaikan
+Fitur antarmuka yang telah tersedia:
 
-- [x] **Cetak Label Barcode** (`/admin/barcode-print`) — Halaman cetak label barcode client-side menggunakan `bwip-js/browser`.
-- [x] **Import Data Excel** (`/admin/import`) — Parser Excel/CSV menggunakan `exceljs` dan `TextDecoder` (in-memory, tanpa write ke disk). Fitur: unduh template impor dengan header warna-warni, file drop & upload, preview tabel data sebelum konfirmasi, validasi penuh di server (format SKU/barcode, lookup kategori/satuan, cek duplikasi di database/file), input confirmation block double click, all-or-nothing transactional insertion (lewat server actions), log batch summary di `import_batches` dan `audit_logs`.
+- Dashboard Admin
+- Dashboard Employee
+- Barcode scanning
+- Barcode printing
+- PWA
+- Responsive navigation
+- Dark/light theme
 
----
+## E2E Coverage
 
-## Milestone 6 — Laporan & Ekspor ✅
+Playwright saat ini memverifikasi:
 
-### Diselesaikan
+1. Halaman login
+2. Login Admin
+3. Login Employee
+4. Forced password change
+5. Stock-in Admin
+6. Stock-out Employee
+7. Reversal stock-out
+8. Reversal stock-in
+9. Integritas stok setelah transaksi
+10. Endpoint export laporan Excel
 
-- [x] **Laporan Transaksi** (`/admin/reports`) — Halaman laporan admin dengan pencarian dan filter rentang tanggal (default 30 hari terakhir di WIB) serta jenis transaksi. Fitur: Ringkasan total stok masuk, stok keluar, jumlah transaksi, dan barang dengan stok rendah (≤ minimum limit), tabel transaksi paginated, export CSV dengan filter aktif dan proteksi CSV Formula Injection (sanitasi prefix `=`, `+`, `-`, `@`), aman tanpa kebocoran data sensitif.
+Seluruh E2E dijalankan terhadap project Supabase khusus testing.
 
----
+## Testing Environment
 
-## Route Sidebar yang Masih 404 (Belum Diimplementasikan)
+Project aplikasi utama dan E2E dipisahkan:
 
-| Route | Label Menu | Status |
-|---|---|---|
-| `/admin/account` | Akun (footer sidebar) | ❌ 404 — belum ada `page.tsx` |
-| `/employee` | (redirect ke employee dashboard) | ⚠️ Ada layout tapi konten minimal |
+- `.env.local` untuk aplikasi utama
+- `.env.test.local` untuk Supabase testing
+- `.env.test.example` sebagai template aman
 
----
+Credential, password, service-role key, dan secret nyata tidak boleh disimpan di repository.
 
-## Langkah Selanjutnya (Milestone 5 & Milestone 7-8)
+Playwright memiliki fail-safe agar E2E tidak secara tidak sengaja berjalan terhadap project Supabase yang salah.
 
-1. **Modul Pegawai / Employee UI** (`/employee`) — Form keluar barang, kamera barcode scanner (`@zxing/browser`), riwayat transaksi pegawai.
-2. **Halaman Akun** (`/admin/account`) — Ganti username/password self-service.
-3. **PWA & Offline Queue** — Service Worker, manifest, antrian transaksi saat offline.
+## Repository Cleanup
 
+Cleanup repository yang telah dilakukan:
 
+- Menghapus `.tmp/remote-database-types.ts` yang sebelumnya ter-track
+- Menambahkan `.tmp/` ke `.gitignore`
+- Menghapus logo root yang tidak digunakan
+- Meng-ignore artifact Playwright, coverage, build, dependency, dan environment lokal
+- Menambahkan `.env.test.example`
+
+## Supabase CLI
+
+Sebelum menjalankan operasi database, selalu periksa project yang sedang ter-link.
+
+Gunakan minimal:
+
+`npx supabase migration list --linked`
+
+dan:
+
+`npx supabase db push --linked --dry-run`
+
+Jangan menjalankan `db push` tanpa `--dry-run` sebelum memastikan target project benar.
+
+## Deployment
+
+Deployment production ke Vercel belum dinyatakan terverifikasi dalam dokumen ini.
+
+Sebelum production:
+
+- pastikan environment variable production lengkap
+- pastikan self-signup Supabase nonaktif
+- pastikan migration `001â€“015` sudah diterapkan
+- lakukan Preview deployment
+- lakukan smoke test
+- jangan gunakan credential E2E di production
+
+## Dokumentasi
+
+- `README.md` â€” setup dan penggunaan proyek
+- `docs/00-rencana-eksekusi.md` â€” rencana awal/historis
+- `docs/02-srs.md` â€” requirements
+- `docs/04-arsitektur.md` â€” arsitektur
+- `docs/09-keamanan-dan-rls.md` â€” keamanan dan RLS
+- `docs/progress.md` â€” status proyek terbaru

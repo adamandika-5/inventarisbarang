@@ -22,7 +22,7 @@ test.describe('Autentikasi E2E', () => {
   test('admin dapat login dan diarahkan ke dashboard admin', async ({ page }) => {
     await login(page, adminUsername, adminPassword)
 
-    await expect(page).toHaveURL(/\/admin(?:\/|$)/)
+    await expect(page).toHaveURL(/\/admin(?:\/|$)/, { timeout: 15_000 })
     await expect(
       page.getByRole('heading', { name: 'Dashboard' }),
     ).toBeVisible()

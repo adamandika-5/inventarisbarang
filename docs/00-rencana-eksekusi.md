@@ -2,7 +2,7 @@
 
 **Tanggal**: 2026-07-20  
 **Versi prompt**: v2  
-**Status**: Aktif (Milestone 1)
+**Status**: Dokumen historis - lihat docs/progress.md untuk status proyek terkini
 
 ## Ringkasan
 

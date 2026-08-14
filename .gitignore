@@ -1,6 +1,7 @@
-# Environment files
+﻿# Environment files
 .env*
 !.env.example
+!.env.test.example
 
 # Temporary workspace
 scratch/

@@ -119,3 +119,63 @@ Aturan ketat:
 - JANGAN log password, token, atau internal email
 - Service role key hanya di .env.local (lokal) dan Vercel env vars (production)
 - Internal email tidak pernah dikirim ke browser atau masuk log
+
+## 10. Login Rate Limiting
+
+Endpoint login menggunakan distributed rate limiting yang disimpan di PostgreSQL.
+
+Perlindungan yang diterapkan:
+
+- Kegagalan login menggunakan pesan generik dan tidak mengungkap apakah username terdaftar.
+- Rate limiting diterapkan berdasarkan akun dan sumber request.
+- State rate limiter tidak hanya disimpan di memory instance aplikasi.
+- Identifier sensitif di-hash pada sisi server.
+- `LOGIN_RATE_LIMIT_SECRET` hanya boleh tersedia pada environment server.
+- `LOGIN_RATE_LIMIT_SECRET` tidak boleh menggunakan prefix `NEXT_PUBLIC_`.
+
+Implementasi database ditambahkan melalui migration:
+
+`supabase/migrations/015_login_rate_limiting.sql`
+
+Tujuannya adalah mengurangi risiko brute-force dan credential stuffing serta menjaga limiter tetap konsisten pada deployment dengan lebih dari satu instance aplikasi.
+
+## 11. Keamanan Environment Testing dan E2E
+
+End-to-end test menggunakan project Supabase khusus testing dan harus dipisahkan dari database production.
+
+Aturan yang berlaku:
+
+- `.env.test.local` tidak boleh di-commit.
+- `.env.test.example` hanya berisi placeholder aman.
+- Akun E2E hanya digunakan pada project testing.
+- Service-role key testing tidak boleh digunakan pada production.
+- Credential E2E tidak boleh disimpan di source code atau dokumentasi.
+- Playwright memiliki fail-safe untuk memeriksa target project Supabase sebelum test dijalankan.
+- Test transaksi tidak menghapus histori ledger asli sebagai bagian dari cleanup.
+
+Environment E2E meliputi:
+
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `LOGIN_RATE_LIMIT_SECRET`
+- `E2E_ADMIN_USERNAME`
+- `E2E_ADMIN_PASSWORD`
+- `E2E_EMPLOYEE_USERNAME`
+- `E2E_EMPLOYEE_PASSWORD`
+
+## 12. Secret Management Tambahan
+
+Secret server-side utama:
+
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `LOGIN_RATE_LIMIT_SECRET`
+
+Credential testing yang sensitif:
+
+- `E2E_ADMIN_PASSWORD`
+- `E2E_EMPLOYEE_PASSWORD`
+
+Nilai nyata hanya boleh berada di file environment lokal yang di-ignore Git atau secret manager pada environment deployment.
+
+Secret, password, token, dan service-role key tidak boleh dicetak ke log, ditulis ke README, atau di-commit ke repository.
