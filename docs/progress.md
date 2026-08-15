@@ -1,174 +1,107 @@
-﻿# Progress â€” InventarisBarang
+# Progress — InventarisBarang
 
-**Terakhir diperbarui:** 2026-08-14
-**Status:** Finalisasi, hardening, testing, dan dokumentasi
+**Terakhir diperbarui:** 2026-08-15
+**Status:** Release Ready v1.0.0
 
 ## Quality Gate Terakhir
 
 | Pemeriksaan | Perintah | Status | Hasil |
 |---|---|---|---|
 | Type check | `npm run type-check` | PASSED | 0 error |
-| Unit tests | `npm run test` | PASSED | 34 test files, 502 tests passed |
-| E2E Playwright | `npm run test:e2e` | PASSED | 5 tests passed |
+| Lint | `npm run lint` | PASSED | 0 error |
+| Unit tests | `npm run test` | PASSED | 35 test files passed |
+| E2E Playwright | `npm run test:e2e` | PASSED | 5 tests passed (Testing Environment) |
 | Diff check | `git diff --check` | PASSED | Tidak ada whitespace error |
+
+## Status Produksi (Production Readiness)
+
+Aplikasi telah berhasil melewati seluruh tahapan audit kesiapan produksi:
+
+1. **Vercel Production:**
+   - URL Produksi: [https://inventarisbarang.vercel.app](https://inventarisbarang.vercel.app)
+   - Status deployment: `Ready` (Next.js 15.5.23 on Node.js 24.x)
+   - Security headers aktif (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Cache-Control).
+
+2. **Database Produksi (Supabase):**
+   - Project: `inventarisbarang` (`ruvfxziudpfyntahupqn`)
+   - Migrations `001–015` berurutan dan cocok 100% dengan remote (`MATCH`).
+   - `supabase db push --dry-run` mengonfirmasi status database telah `up to date`.
+
+3. **Smoke Test Produksi:**
+   - Seluruh rute publik dan terproteksi telah diuji.
+   - Proteksi unauthenticated (redirect 307 ke `/login`) bekerja konsisten tanpa HTTP 500.
+
+4. **Uji Transaksi & Reversal Terkontrol (Controlled Production Transaction Test):**
+   - Kandidat uji: `Penghapus` (`ATK-0007`)
+   - Siklus Barang Masuk: `90 Pcs` $\rightarrow$ `91 Pcs` $\rightarrow$ Reversal $\rightarrow$ `90 Pcs` (PASS)
+   - Siklus Barang Keluar: `90 Pcs` $\rightarrow$ `89 Pcs` $\rightarrow$ Reversal $\rightarrow$ `90 Pcs` (PASS)
+   - Integritas stok akhir kembali presisi ke baseline `90 Pcs` dengan net quantity `0`.
+   - Proteksi double reversal dan pencatatan audit log terverifikasi 100%.
+
+5. **Pemisahan Environment (Isolation):**
+   - Produksi (`.env.local` $\rightarrow$ `ruvfxziudpfyntahupqn`) dan Testing (`.env.test.local` $\rightarrow$ `dncyhftgkwkdhksvxaob`) terisolasi penuh.
+   - Tidak ada akun testing atau data E2E yang bocor ke environment produksi.
+
+## Status Backup & Pemulihan (Backup & Recovery)
+
+- **Manual Production Backup:** DEFERRED (Ditunda).
+- **Alasan:** Keterbatasan penyimpanan lokal dan dependensi Docker Desktop untuk eksekusi utilitas CLI `supabase db dump`.
+- **Konfigurasi Supabase Free Plan:** Scheduled backup otomatis dan PITR tidak tersedia pada tier gratis saat audit dilakukan.
+- **Rencana Pemulihan (Recovery Plan):** Telah terdokumentasi (pemanfaatan in-app reversal untuk koreksi operasional, skema restore berurutan `roles` $\rightarrow$ `schema` $\rightarrow$ `data` untuk disaster recovery).
+- **Rekomendasi:** Backup logis manual harus segera dibuat ketika kapasitas penyimpanan lokal atau Docker telah tersedia.
 
 ## Database dan Migration
 
-Migration saat ini tersedia sampai:
+Migration saat ini tersedia lengkap dan berurutan:
 
-- `001_initial_schema.sql`
-- `002_rls_and_grants.sql`
-- `003_stock_rpc_functions.sql`
-- `004_admin_bootstrap_function.sql`
-- `005_harden_login_lookup_permissions.sql`
-- `006_fix_stock_rpc_item_unit.sql`
-- `007_complete_forced_password_change.sql`
-- `008_get_stock_transaction_costs_rpc.sql`
-- `009_audit_logs_rpc_and_fixes.sql`
-- `010_fix_log_audit_event_rpc.sql`
-- `011_quantity_only_stock_rpcs.sql`
-- `012_dashboard_stats_rpc.sql`
-- `013_report_summary_rpc.sql`
-- `014_fix_idempotency_audit_logs_and_admin_bootstrap.sql`
-- `015_login_rate_limiting.sql`
-
-Migration `001â€“015` telah diuji pada project Supabase testing.
+- `001_initial_schema.sql` — Skema dasar dan relasi
+- `002_rls_and_grants.sql` — Kebijakan RLS dan hak akses
+- `003_stock_rpc_functions.sql` — Fungsi RPC transaksi stok
+- `004_admin_bootstrap_function.sql` — Inisialisasi akun admin
+- `005_harden_login_lookup_permissions.sql` — Pengerasan izin lookup login
+- `006_fix_stock_rpc_item_unit.sql` — Koreksi konversi satuan transaksi
+- `007_complete_forced_password_change.sql` — Alur ganti kata sandi wajib
+- `008_get_stock_transaction_costs_rpc.sql` — RPC kalkulasi biaya transaksi
+- `009_audit_logs_rpc_and_fixes.sql` — RPC dan indeks audit log
+- `010_fix_log_audit_event_rpc.sql` — Penyesuaian logging event audit
+- `011_quantity_only_stock_rpcs.sql` — Transisi transaksi stok berbasis kuantitas
+- `012_dashboard_stats_rpc.sql` — RPC statistik dashboard
+- `013_report_summary_rpc.sql` — RPC ringkasan laporan
+- `014_fix_idempotency_audit_logs_and_admin_bootstrap.sql` — Idempotensi penyesuaian stok, penguncian baris, dan audit log
+- `015_login_rate_limiting.sql` — Rate limiting login multi-dimensi
 
 ## Authentication dan Security
 
-Fitur keamanan yang telah diterapkan:
+- Login dengan username melalui Backend-for-Frontend (BFF)
+- Self-signup dinonaktifkan
+- Pemisahan hak akses Admin dan Employee di tingkat middleware, layout server, dan database
+- Pemeriksaan status akun aktif (`is_active`)
+- Forced password change untuk akun baru atau pasca-reset
+- Rate limiting login multi-layer (akun, IP, dan kombinasi akun-IP) dengan HMAC hashing `LOGIN_RATE_LIMIT_SECRET`
+- Row Level Security (RLS) pada semua tabel publik
+- Operasi mutasi stok atomik dengan `SECURITY DEFINER` RPC dan row-level locking
 
-- Login dengan username melalui BFF
-- Self-signup tidak digunakan
-- Role Admin dan Employee terpisah
-- Pemeriksaan status akun aktif
-- Forced password change
-- Reset password Employee oleh Admin
-- Pesan kegagalan login generik
-- Distributed login rate limiting
-- Rate limiting berdasarkan akun dan sumber request
-- Hashing server-side dengan `LOGIN_RATE_LIMIT_SECRET`
-- Server-side authorization
-- Row Level Security
-- RPC database untuk operasi sensitif
+## Master Data & Transaksi Stok
 
-## Master Data
+- Manajemen barang, kategori, satuan, dan pengguna
+- Barcode generator (CODE128) dan barcode printing
+- Scan barcode melalui kamera untuk operasional barang keluar
+- Transaksi barang masuk, barang keluar, penyesuaian stok, dan pembatalan transaksi (reversal)
+- Idempotency berbasis `client_request_id`
+- Ledger transaksi stok dan audit log append-only
 
-Fitur master data yang telah tersedia:
+## Laporan & Ekspor
 
-- Manajemen barang
-- Manajemen kategori
-- Manajemen satuan
-- Manajemen pengguna
-- Barcode
-- SKU
-
-## Transaksi Stok
-
-Fitur transaksi yang telah tersedia:
-
-- Stock-in oleh Admin
-- Stock-out oleh Employee
-- Penyesuaian stok
-- Reversal transaksi
-- Atomic RPC
-- Row locking
-- Idempotency menggunakan `client_request_id`
-- Audit log transaksi
-
-## Laporan
-
-Fitur laporan yang telah tersedia:
-
-- Ringkasan persediaan
-- Laporan transaksi
-- Filter tanggal
-- Export Excel
-- Validasi endpoint export melalui E2E
-
-## UI dan Operasional
-
-Fitur antarmuka yang telah tersedia:
-
-- Dashboard Admin
-- Dashboard Employee
-- Barcode scanning
-- Barcode printing
-- PWA
-- Responsive navigation
-- Dark/light theme
-
-## E2E Coverage
-
-Playwright saat ini memverifikasi:
-
-1. Halaman login
-2. Login Admin
-3. Login Employee
-4. Forced password change
-5. Stock-in Admin
-6. Stock-out Employee
-7. Reversal stock-out
-8. Reversal stock-in
-9. Integritas stok setelah transaksi
-10. Endpoint export laporan Excel
-
-Seluruh E2E dijalankan terhadap project Supabase khusus testing.
-
-## Testing Environment
-
-Project aplikasi utama dan E2E dipisahkan:
-
-- `.env.local` untuk aplikasi utama
-- `.env.test.local` untuk Supabase testing
-- `.env.test.example` sebagai template aman
-
-Credential, password, service-role key, dan secret nyata tidak boleh disimpan di repository.
-
-Playwright memiliki fail-safe agar E2E tidak secara tidak sengaja berjalan terhadap project Supabase yang salah.
-
-## Repository Cleanup
-
-Cleanup repository yang telah dilakukan:
-
-- Menghapus `.tmp/remote-database-types.ts` yang sebelumnya ter-track
-- Menambahkan `.tmp/` ke `.gitignore`
-- Menghapus logo root yang tidak digunakan
-- Meng-ignore artifact Playwright, coverage, build, dependency, dan environment lokal
-- Menambahkan `.env.test.example`
-
-## Supabase CLI
-
-Sebelum menjalankan operasi database, selalu periksa project yang sedang ter-link.
-
-Gunakan minimal:
-
-`npx supabase migration list --linked`
-
-dan:
-
-`npx supabase db push --linked --dry-run`
-
-Jangan menjalankan `db push` tanpa `--dry-run` sebelum memastikan target project benar.
-
-## Deployment
-
-Deployment production ke Vercel belum dinyatakan terverifikasi dalam dokumen ini.
-
-Sebelum production:
-
-- pastikan environment variable production lengkap
-- pastikan self-signup Supabase nonaktif
-- pastikan migration `001â€“015` sudah diterapkan
-- lakukan Preview deployment
-- lakukan smoke test
-- jangan gunakan credential E2E di production
+- Ringkasan persediaan dan laporan transaksi
+- Filter berdasarkan rentang tanggal
+- Ekspor laporan ke file Excel (`.xlsx`) via streaming server
 
 ## Dokumentasi
 
-- `README.md` â€” setup dan penggunaan proyek
-- `docs/00-rencana-eksekusi.md` â€” rencana awal/historis
-- `docs/02-srs.md` â€” requirements
-- `docs/04-arsitektur.md` â€” arsitektur
-- `docs/09-keamanan-dan-rls.md` â€” keamanan dan RLS
-- `docs/progress.md` â€” status proyek terbaru
+- `README.md` — Panduan setup dan penggunaan proyek
+- `docs/release-v1.0.0.md` — Catatan rilis versi final 1.0.0
+- `docs/00-rencana-eksekusi.md` — Rencana historis
+- `docs/02-srs.md` — Spesifikasi kebutuhan perangkat lunak (SRS)
+- `docs/04-arsitektur.md` — Arsitektur sistem
+- `docs/09-keamanan-dan-rls.md` — Dokumentasi keamanan dan kebijakan RLS
+- `docs/progress.md` — Status kesiapan produksi
