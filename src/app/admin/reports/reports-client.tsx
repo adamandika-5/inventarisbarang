@@ -529,7 +529,7 @@ export default function ReportsClient({
           <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-slate-100">
             Barang Stok Rendah
             <span className="ml-2 text-sm font-normal text-slate-500 dark:text-slate-400">
-              (stok ≤ minimum, maks 20 barang)
+              (stok ≤ minimum)
             </span>
           </h2>
           {lowStockItems.length === 0 ? (
